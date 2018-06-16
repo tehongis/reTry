@@ -1,17 +1,9 @@
 * ProTracker2.2a replay routine by Crayon/Noxious. Improved and modified
 * by Teeme of Fist! Unlimited in 1992. Share and enjoy! :)
-* Rewritten for Devpac (slightly..) by CJ. Devpac does not like bsr.L
-* cmpi is compare immediate, it requires immediate data! And some
-* labels had upper/lower case wrong...
-*
-* Now improved to make it work better if CIA timed - thanks Marco!
+* Rewritten for Devpac (slightly..) by CJ.
 
-* Call Mt_data with A0 pointing to your module data...
-
-
-ExecBase = 4	; Teeme, you *really* should use includes!
-Disable = -120	; :-)
-Enable = -126	
+; slight edits by Tero Hongisto
+; pt_init with a0 pointing to module data.
 
 N_Note = 0  ; W
 N_Cmd = 2  ; W
@@ -39,18 +31,18 @@ N_LoopCount = 34 ; B
 N_FunkOffset = 35 ; B
 N_WaveStart = 36 ; L
 N_RealLength = 40 ; W
-MT_SongDataPtr = -18
-MT_Speed = -14
-MT_Counter = -13
-MT_SongPos = -12
-MT_PBreakPos = -11
-MT_PosJumpFlag = -10
-MT_PBreakFlag = -9
-MT_LowMask = -8
-MT_PattDelTime = -7
-MT_PattDelTime2 = -6
-MT_PatternPos = -4
-MT_DMACONTemp = -2
+pt_SongDataPtr = -18
+pt_Speed = -14
+pt_Counter = -13
+pt_SongPos = -12
+pt_PBreakPos = -11
+pt_PosJumpFlag = -10
+pt_PBreakFlag = -9
+pt_LowMask = -8
+pt_PattDelTime = -7
+pt_PattDelTime2 = -6
+pt_PatternPos = -4
+pt_DMACONTemp = -2
 
 
 ;	A little (not very good!) example code to
@@ -59,17 +51,15 @@ MT_DMACONTemp = -2
 ;	movem.l	d0-d7/a0-a6,-(a7)
 ;	move.l	ExecBase,a6
 ;	jsr	Disable(a6)
-;	lea	Variables,a5
-;	lea	$dff000,a6
-;	bsr.s	MT_Init
+;	bsr.s	pt_Init
 ;VBlankLoop:
 ;	cmpi.b	#$40,$dff006	;should use WaitTOF()
 ;	bne.s	VBlankLoop	;from graphics.library
-;	bsr.L	mt_music
+;	bsr.L	pt_music
 ;	btst 	#6,$bfe001
 ;	bne.s 	VBlankLoop
 ;Exit:
-;	bsr	MT_End
+;	bsr	pt_End
 ;	move.l	ExecBase,a6
 ;	jsr	Enable(a6)
 ;	movem.l	(a7)+,d0-d7/a0-a6
@@ -78,11 +68,13 @@ MT_DMACONTemp = -2
 
 
 
-MT_Init:
-	move.l	a0,MT_SongDataPtr(a5)
-	lea	952(a0),a1
-	moveq	#127,D0
-	moveq	#0,D1
+pt_Init:
+	lea			Variables,a5
+	lea			CUSTOM,a6
+	move.l	a0,pt_SongDataPtr(a5)
+	lea			952(a0),a1
+	moveq		#127,D0
+	moveq		#0,D1
 MTLoop:
 	move.l	d1,d2
 	subq.w	#1,d0
@@ -92,7 +84,7 @@ MTLoop2:
 	bgt.s	MTLoop
 	dbf	d0,MTLoop2
 	addq.b	#1,d2
-			
+
 	move.l	a5,a1
 	suba.w	#142,a1
 	asl.l	#8,d2
@@ -112,11 +104,11 @@ MTLoop3:
 	dbf	d0,MTLoop3
 
 	ori.b	#2,$bfe001
-	move.b	#6,MT_Speed(a5)
-	clr.b	MT_Counter(a5)
-	clr.b	MT_SongPos(a5)
-	clr.w	MT_PatternPos(a5)
-MT_End:
+	move.b	#6,pt_Speed(a5)
+	clr.b	pt_Counter(a5)
+	clr.b	pt_SongPos(a5)
+	clr.w	pt_PatternPos(a5)
+pt_End:
 	clr.w	$0A8(a6)
 	clr.w	$0B8(a6)
 	clr.w	$0C8(a6)
@@ -124,69 +116,69 @@ MT_End:
 	move.w	#$f,$096(a6)
 	rts
 
-MT_Music:
+pt_Music:
 	movem.l	d0-d4/a0-a6,-(a7)
-	addq.b	#1,MT_Counter(a5)
-	move.b	MT_Counter(a5),d0
-	cmp.b	MT_Speed(a5),d0
-	blo.s	MT_NoNewNote
-	clr.b	MT_Counter(a5)
-	tst.b	MT_PattDelTime2(a5)
-	beq.s	MT_GetNewNote
-	bsr.s	MT_NoNewAllChannels
-	bra	MT_Dskip
+	addq.b	#1,pt_Counter(a5)
+	move.b	pt_Counter(a5),d0
+	cmp.b	pt_Speed(a5),d0
+	blo.s	pt_NoNewNote
+	clr.b	pt_Counter(a5)
+	tst.b	pt_PattDelTime2(a5)
+	beq.s	pt_GetNewNote
+	bsr.s	pt_NoNewAllChannels
+	bra	pt_Dskip
 
-MT_NoNewNote:
-	bsr.s	MT_NoNewAllChannels
-	bra	MT_NoNewPosYet
-MT_NoNewAllChannels:
+pt_NoNewNote:
+	bsr.s	pt_NoNewAllChannels
+	bra	pt_NoNewPosYet
+pt_NoNewAllChannels:
 	move.w	#$a0,d5
 	move.l	a5,a4
 	suba.w	#318,a4
-	bsr	MT_CheckEfx
+	bsr	pt_CheckEfx
 	move.w	#$b0,d5
 	adda.w	#44,a4
-	bsr	MT_CheckEfx
+	bsr	pt_CheckEfx
 	move.w	#$c0,d5
 	adda.w	#44,a4
-	bsr	MT_CheckEfx
+	bsr	pt_CheckEfx
 	move.w	#$d0,d5
 	adda.w	#44,a4
-	bra	MT_CheckEfx
-MT_GetNewNote:
-	move.l	MT_SongDataPtr(a5),a0
+	bra	pt_CheckEfx
+pt_GetNewNote:
+	move.l	pt_SongDataPtr(a5),a0
 	lea	12(a0),a3
 	lea	952(a0),a2	;pattpo
 	lea	1084(a0),a0	;patterndata
 	moveq	#0,d0
 	moveq	#0,d1
-	move.b	MT_SongPos(a5),d0
+	move.b	pt_SongPos(a5),d0
 	move.b	(a2,d0.w),d1
 	asl.l	#8,d1
 	asl.l	#2,d1
-	add.w	MT_PatternPos(a5),d1
-	clr.w	MT_DMACONTemp(a5)
+	add.w	pt_PatternPos(a5),d1
+	clr.w	pt_DMACONTemp(a5)
 
 	move.w	#$a0,d5
 	move.l	a5,a4
 	suba.w	#318,a4
-	bsr.s	MT_PlayVoice
+	bsr.s	pt_PlayVoice
 	move.w	#$b0,d5
 	adda.w	#44,a4
-	bsr.s	MT_PlayVoice
+	bsr.s	pt_PlayVoice
 	move.w	#$c0,d5
 	adda.w	#44,a4
-	bsr.s	MT_PlayVoice
+	bsr.s	pt_PlayVoice
 	move.w	#$d0,d5
 	adda.w	#44,a4
-	bsr.s	MT_PlayVoice
-	bra	MT_SetDMA
+	bsr.s	pt_PlayVoice
+	bra	pt_SetDMA
 
-MT_PlayVoice:
+pt_PlayVoice:
 	tst.l	(a4)
-	bne.s	MT_PlvSkip
-	bsr	MT_PerNop
-MT_PlvSkip:
+	bne.s	pt_PlvSkip
+	bsr	pt_PerNop
+pt_PlvSkip:
 	move.l	(a0,d1.l),(a4)
 	addq.l	#4,d1
 	moveq	#0,d2
@@ -196,7 +188,7 @@ MT_PlvSkip:
 	move.b	(a4),d0
 	andi.b	#$f0,d0
 	or.b	d0,d2
-	beq	MT_SetRegs
+	beq	pt_SetRegs
 	moveq	#0,d3
 	move.l	a5,a1
 	suba.w	#142,a1
@@ -210,7 +202,7 @@ MT_PlvSkip:
 	move.b	2(a3,d4.l),N_FineTune(a4)
 	move.b	3(a3,d4.l),N_Volume(a4)
 	move.w	4(a3,d4.l),d3 ; Get repeat
-	beq.s	MT_NoLoop
+	beq.s	pt_NoLoop
 	move.l	N_Start(a4),d2 ; Get start
 	add.w	d3,d3
 	add.l	d3,d2		; Add repeat
@@ -223,9 +215,9 @@ MT_PlvSkip:
 	moveq	#0,d0
 	move.b	N_Volume(a4),d0
 	move.w	d0,8(a6,d5.w)	; Set volume
-	bra.s	MT_SetRegs
+	bra.s	pt_SetRegs
 
-MT_NoLoop:
+pt_NoLoop:
 	move.l	N_Start(a4),d2
 	add.l	d3,d2
 	move.l	d2,N_LoopStart(a4)
@@ -234,46 +226,46 @@ MT_NoLoop:
 	moveq	#0,d0
 	move.b	N_Volume(a4),d0
 	move.w	d0,8(a6,d5.w)	; Set volume
-MT_SetRegs:
+pt_SetRegs:
 	move.w	(a4),d0
 	andi.w	#$0fff,d0
-	beq	MT_CheckMoreEfx	; If no note
+	beq	pt_CheckMoreEfx	; If no note
 	move.w	2(a4),d0
 	andi.w	#$0ff0,d0
 	cmpi.w	#$0e50,d0
-	beq.s	MT_DoSetFineTune
+	beq.s	pt_DoSetFineTune
 	move.b	2(a4),d0
 	andi.b	#$0f,d0
 	cmpi.b	#3,d0	; TonePortamento
-	beq.s	MT_ChkTonePorta
+	beq.s	pt_ChkTonePorta
 	cmpi.b	#5,d0
-	beq.s	MT_ChkTonePorta
+	beq.s	pt_ChkTonePorta
 	cmpi.b	#9,d0	; Sample Offset
-	bne.s	MT_SetPeriod
-	bsr	MT_CheckMoreEfx
-	bra.s	MT_SetPeriod
+	bne.s	pt_SetPeriod
+	bsr	pt_CheckMoreEfx
+	bra.s	pt_SetPeriod
 
-MT_DoSetFineTune:
-	bsr	MT_SetFineTune
-	bra.s	MT_SetPeriod
+pt_DoSetFineTune:
+	bsr	pt_SetFineTune
+	bra.s	pt_SetPeriod
 
-MT_ChkTonePorta:
-	bsr	MT_SetTonePorta
-	bra	MT_CheckMoreEfx
+pt_ChkTonePorta:
+	bsr	pt_SetTonePorta
+	bra	pt_CheckMoreEfx
 
-MT_SetPeriod:
+pt_SetPeriod:
 	movem.l	d0-d1/a0-a1,-(a7)
 	move.w	(a4),d1
 	andi.w	#$0fff,d1
-	lea	MT_PeriodTable(pc),a1
+	lea	pt_PeriodTable(pc),a1
 	moveq	#0,d0
 	moveq	#36,d7
-MT_FtuLoop:
+pt_FtuLoop:
 	cmp.w	(a1,d0.w),d1
-	bhs.s	MT_FtuFound
+	bhs.s	pt_FtuFound
 	addq.l	#2,d0
-	dbf	d7,MT_FtuLoop
-MT_FtuFound:
+	dbf	d7,pt_FtuLoop
+pt_FtuFound:
 	moveq	#0,d1
 	move.b	N_FineTune(a4),d1
 	mulu	#72,d1
@@ -284,31 +276,31 @@ MT_FtuFound:
 	move.w	2(a4),d0
 	andi.w	#$0ff0,d0
 	cmpi.w	#$0ed0,d0 ; Notedelay
-	beq	MT_CheckMoreEfx
+	beq	pt_CheckMoreEfx
 
 	move.w	N_DMABit(a4),$096(a6)
 	btst	#2,N_WaveControl(a4)
-	bne.s	MT_Vibnoc
+	bne.s	pt_Vibnoc
 	clr.b	N_VibratoPos(a4)
-MT_Vibnoc:
+pt_Vibnoc:
 	btst	#6,N_WaveControl(a4)
-	bne.s	MT_Trenoc
+	bne.s	pt_Trenoc
 	clr.b	N_TremoloPos(a4)
-MT_Trenoc:
+pt_Trenoc:
 	move.l	N_Start(a4),(a6,d5.w)	; Set start
 	move.w	N_Length(a4),4(a6,d5.w)	; Set length
 	move.w	N_Period(a4),d0
 	move.w	d0,6(a6,d5.w)		; Set period
 	move.w	N_DMABit(a4),d0
-	or.w	d0,MT_DMACONTemp(a5)
-	bra	MT_CheckMoreEfx
- 
-MT_SetDMA:
-	bsr	MT_DMAWaitLoop
-	move.w	MT_DMACONTemp(a5),d0
+	or.w	d0,pt_DMACONTemp(a5)
+	bra	pt_CheckMoreEfx
+
+pt_SetDMA:
+	bsr	pt_DMAWaitLoop
+	move.w	pt_DMACONTemp(a5),d0
 	ori.w	#$8000,d0
 	move.w	d0,$096(a6)
-	bsr	MT_DMAWaitLoop
+	bsr	pt_DMAWaitLoop
 	move.l	a5,a4
 	suba.w	#186,a4
 	move.l	N_LoopStart(a4),$d0(a6)
@@ -323,322 +315,322 @@ MT_SetDMA:
 	move.l	N_LoopStart(a4),$a0(a6)
 	move.w	N_Replen(a4),$a4(a6)
 
-MT_Dskip:
-	addi.w	#16,MT_PatternPos(a5)
-	move.b	MT_PattDelTime(a5),d0
-	beq.s	MT_Dskc
-	move.b	d0,MT_PattDelTime2(a5)
-	clr.b	MT_PattDelTime(a5)
-MT_Dskc:
-	tst.b	MT_PattDelTime2(a5)
-	beq.s	MT_Dska
-	subq.b	#1,MT_PattDelTime2(a5)
-	beq.s	MT_Dska
-	sub.w	#16,MT_PatternPos(a5)
-MT_Dska:
-	tst.b	MT_PBreakFlag(a5)
-	beq.s	MT_Nnpysk
-	clr.b	MT_PBreakFlag(a5)
+pt_Dskip:
+	addi.w	#16,pt_PatternPos(a5)
+	move.b	pt_PattDelTime(a5),d0
+	beq.s	pt_Dskc
+	move.b	d0,pt_PattDelTime2(a5)
+	clr.b	pt_PattDelTime(a5)
+pt_Dskc:
+	tst.b	pt_PattDelTime2(a5)
+	beq.s	pt_Dska
+	subq.b	#1,pt_PattDelTime2(a5)
+	beq.s	pt_Dska
+	sub.w	#16,pt_PatternPos(a5)
+pt_Dska:
+	tst.b	pt_PBreakFlag(a5)
+	beq.s	pt_Nnpysk
+	clr.b	pt_PBreakFlag(a5)
 	moveq	#0,d0
-	move.b	MT_PBreakPos(a5),d0
-	clr.b	MT_PBreakPos(a5)
+	move.b	pt_PBreakPos(a5),d0
+	clr.b	pt_PBreakPos(a5)
 	lsl.w	#4,d0
-	move.w	d0,MT_PatternPos(a5)
-MT_Nnpysk:
-	cmpi.w	#1024,MT_PatternPos(a5)
-	blo.s	MT_NoNewPosYet
-MT_NextPosition:	
+	move.w	d0,pt_PatternPos(a5)
+pt_Nnpysk:
+	cmpi.w	#1024,pt_PatternPos(a5)
+	blo.s	pt_NoNewPosYet
+pt_NextPosition:
 	moveq	#0,d0
-	move.b	MT_PBreakPos(a5),d0
+	move.b	pt_PBreakPos(a5),d0
 	lsl.w	#4,d0
-	move.w	d0,MT_PatternPos(a5)
-	clr.b	MT_PBreakPos(a5)
-	clr.b	MT_PosJumpFlag(a5)
-	addq.b	#1,MT_SongPos(a5)
-	andi.b	#$7F,MT_SongPos(a5)
-	move.b	MT_SongPos(a5),d1
-	move.l	MT_SongDataPtr(a5),a0
+	move.w	d0,pt_PatternPos(a5)
+	clr.b	pt_PBreakPos(a5)
+	clr.b	pt_PosJumpFlag(a5)
+	addq.b	#1,pt_SongPos(a5)
+	andi.b	#$7F,pt_SongPos(a5)
+	move.b	pt_SongPos(a5),d1
+	move.l	pt_SongDataPtr(a5),a0
 	cmp.b	950(a0),d1
-	blo.s	MT_NoNewPosYet
-	clr.b	MT_SongPos(a5)
-MT_NoNewPosYet:	
-	tst.b	MT_PosJumpFlag(a5)
-	bne.s	MT_NextPosition
+	blo.s	pt_NoNewPosYet
+	clr.b	pt_SongPos(a5)
+pt_NoNewPosYet:
+	tst.b	pt_PosJumpFlag(a5)
+	bne.s	pt_NextPosition
 	movem.l	(a7)+,d0-d4/a0-a6
 	rts
 
-MT_CheckEfx:
-	bsr	MT_UpdateFunk
+pt_CheckEfx:
+	bsr	pt_UpdateFunk
 	move.w	N_Cmd(a4),d0
 	andi.w	#$0fff,d0
-	beq.s	MT_PerNop
+	beq.s	pt_PerNop
 	move.b	N_Cmd(a4),d0
 	andi.b	#$0f,d0
-	beq.s	MT_Arpeggio
+	beq.s	pt_Arpeggio
 	cmpi.b	#1,d0
-	beq	MT_PortaUp
+	beq	pt_PortaUp
 	cmpi.b	#2,d0
-	beq	MT_PortaDown
+	beq	pt_PortaDown
 	cmpi.b	#3,d0
-	beq	MT_TonePortamento
+	beq	pt_TonePortamento
 	cmpi.b	#4,d0
-	beq	MT_Vibrato
+	beq	pt_Vibrato
 	cmpi.b	#5,d0
-	beq	MT_TonePlusVolSlide
+	beq	pt_TonePlusVolSlide
 	cmpi.b	#6,d0
-	beq	MT_VibratoPlusVolSlide
+	beq	pt_VibratoPlusVolSlide
 	cmpi.b	#$E,d0
-	beq	MT_E_Commands
+	beq	pt_E_Commands
 SetBack:
 	move.w	N_Period(a4),6(a6,d5.w)
 	cmpi.b	#7,d0
-	beq	MT_Tremolo
+	beq	pt_Tremolo
 	cmpi.b	#$a,d0
-	beq	MT_VolumeSlide
-MT_Return2:
+	beq	pt_VolumeSlide
+pt_Return2:
 	rts
 
-MT_PerNop:
+pt_PerNop:
 	move.w	N_Period(a4),6(a6,d5.w)
 	rts
 
-MT_Arpeggio:
+pt_Arpeggio:
 	moveq	#0,d0
-	move.b	MT_Counter(a5),d0
+	move.b	pt_Counter(a5),d0
 	divs	#3,d0
 	swap	d0
 	tst.w	D0
-	beq.s	MT_Arpeggio2
+	beq.s	pt_Arpeggio2
 	cmpi.w	#2,d0
-	beq.s	MT_Arpeggio1
+	beq.s	pt_Arpeggio1
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	lsr.b	#4,d0
-	bra.s	MT_Arpeggio3
+	bra.s	pt_Arpeggio3
 
-MT_Arpeggio1:
+pt_Arpeggio1:
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#15,d0
-	bra.s	MT_Arpeggio3
+	bra.s	pt_Arpeggio3
 
-MT_Arpeggio2:
+pt_Arpeggio2:
 	move.w	N_Period(a4),d2
-	bra.s	MT_Arpeggio4
+	bra.s	pt_Arpeggio4
 
-MT_Arpeggio3:
+pt_Arpeggio3:
 	add.w	d0,d0
 	moveq	#0,d1
 	move.b	N_FineTune(a4),d1
 	mulu	#72,d1
-	lea	MT_PeriodTable(pc),a0
+	lea	pt_PeriodTable(pc),a0
 	add.w	d1,a0
 	moveq	#0,d1
 	move.w	N_Period(a4),d1
 	moveq	#36,d7
-MT_ArpLoop:
+pt_ArpLoop:
 	move.w	(a0,d0.w),d2
 	cmp.w	(a0),d1
-	bhs.s	MT_Arpeggio4
+	bhs.s	pt_Arpeggio4
 	addq.w	#2,a0
-	dbf	d7,MT_ArpLoop
+	dbf	d7,pt_ArpLoop
 	rts
 
-MT_Arpeggio4:
+pt_Arpeggio4:
 	move.w	d2,6(a6,d5.w)
 	rts
 
-MT_FinePortaUp:
-	tst.b	MT_Counter(a5)
-	bne.s	MT_Return2
-	move.b	#$0f,MT_LowMask(a5)
-MT_PortaUp:
+pt_FinePortaUp:
+	tst.b	pt_Counter(a5)
+	bne.s	pt_Return2
+	move.b	#$0f,pt_LowMask(a5)
+pt_PortaUp:
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
-	and.b	MT_LowMask(a5),d0
-	st	MT_LowMask(a5)
+	and.b	pt_LowMask(a5),d0
+	st	pt_LowMask(a5)
 	sub.w	d0,N_Period(a4)
 	move.w	N_Period(a4),d0
 	andi.w	#$0fff,d0
 	cmpi.w	#113,d0
-	bpl.s	MT_PortaUskip
+	bpl.s	pt_PortaUskip
 	andi.w	#$f000,N_Period(a4)
 	ori.w	#113,N_Period(a4)
-MT_PortaUskip:
-	move.w	N_Period(a4),d0
-	andi.w	#$0fff,d0
-	move.w	d0,6(a6,d5.w)
-	rts
- 
-MT_FinePortaDown:
-	tst.b	MT_Counter(a5)
-	bne	MT_Return2
-	move.b	#$0f,MT_LowMask(a5)
-MT_PortaDown:
-	clr.w	d0
-	move.b	N_Cmdlo(a4),d0
-	and.b	MT_LowMask(a5),d0
-	st	MT_LowMask(a5)
-	add.w	d0,N_Period(a4)
-	move.w	N_Period(a4),d0
-	andi.w	#$0fff,d0
-	cmpi.w	#856,d0
-	bmi.s	MT_PortaDskip
-	andi.w	#$f000,N_Period(a4)
-	ori.w	#856,N_Period(a4)
-MT_PortaDskip:
+pt_PortaUskip:
 	move.w	N_Period(a4),d0
 	andi.w	#$0fff,d0
 	move.w	d0,6(a6,d5.w)
 	rts
 
-MT_SetTonePorta:
+pt_FinePortaDown:
+	tst.b	pt_Counter(a5)
+	bne	pt_Return2
+	move.b	#$0f,pt_LowMask(a5)
+pt_PortaDown:
+	clr.w	d0
+	move.b	N_Cmdlo(a4),d0
+	and.b	pt_LowMask(a5),d0
+	st	pt_LowMask(a5)
+	add.w	d0,N_Period(a4)
+	move.w	N_Period(a4),d0
+	andi.w	#$0fff,d0
+	cmpi.w	#856,d0
+	bmi.s	pt_PortaDskip
+	andi.w	#$f000,N_Period(a4)
+	ori.w	#856,N_Period(a4)
+pt_PortaDskip:
+	move.w	N_Period(a4),d0
+	andi.w	#$0fff,d0
+	move.w	d0,6(a6,d5.w)
+	rts
+
+pt_SetTonePorta:
 	move.l	a0,-(a7)
 	move.w	(a4),d2
 	andi.w	#$0fff,d2
 	moveq	#0,d0
 	move.b	N_FineTune(a4),d0
 	mulu	#74,d0
-	lea	MT_PeriodTable(pc),a0
+	lea	pt_PeriodTable(pc),a0
 	add.w	d0,a0
 	moveq	#0,d0
-MT_StpLoop:
+pt_StpLoop:
 	cmp.w	(a0,d0.w),d2
-	bhs.s	MT_StpFound
+	bhs.s	pt_StpFound
 	addq.w	#2,d0
 	cmpi.w	#74,d0
-	blo.s	MT_StpLoop
+	blo.s	pt_StpLoop
 	moveq	#70,d0
-MT_StpFound:
+pt_StpFound:
 	move.b	N_FineTune(a4),d2
 	andi.b	#8,d2
-	beq.s	MT_StpGoss
+	beq.s	pt_StpGoss
 	tst.w	d0
-	beq.s	MT_StpGoss
+	beq.s	pt_StpGoss
 	subq.w	#2,d0
-MT_StpGoss:
+pt_StpGoss:
 	move.w	(a0,d0.w),d2
 	move.l	(a7)+,a0
 	move.w	d2,N_WantedPeriod(a4)
 	move.w	N_Period(a4),d0
 	clr.b	N_TonePortDirec(a4)
 	cmp.w	d0,d2
-	beq.s	MT_ClearTonePorta
-	bge	MT_Return2
+	beq.s	pt_ClearTonePorta
+	bge	pt_Return2
 	move.b	#1,N_TonePortDirec(a4)
 	rts
 
-MT_ClearTonePorta:
+pt_ClearTonePorta:
 	clr.w	N_WantedPeriod(a4)
 	rts
 
-MT_TonePortamento:
+pt_TonePortamento:
 	move.b	N_Cmdlo(a4),d0
-	beq.s	MT_TonePortNoChange
+	beq.s	pt_TonePortNoChange
 	move.b	d0,N_TonePortSpeed(a4)
 	clr.b	N_Cmdlo(a4)
-MT_TonePortNoChange:
+pt_TonePortNoChange:
 	tst.w	N_WantedPeriod(a4)
-	beq	MT_Return2
+	beq	pt_Return2
 	moveq	#0,d0
 	move.b	N_TonePortSpeed(a4),d0
 	tst.b	N_TonePortDirec(a4)
-	bne.s	MT_TonePortaUp
-MT_TonePortaDown:
+	bne.s	pt_TonePortaUp
+pt_TonePortaDown:
 	add.w	d0,N_Period(a4)
 	move.w	N_WantedPeriod(a4),d0
 	cmp.w	N_Period(a4),d0
-	bgt.s	MT_TonePortaSetPer
+	bgt.s	pt_TonePortaSetPer
 	move.w	N_WantedPeriod(a4),N_Period(a4)
 	clr.w	N_WantedPeriod(a4)
-	bra.s	MT_TonePortaSetPer
+	bra.s	pt_TonePortaSetPer
 
-MT_TonePortaUp:
+pt_TonePortaUp:
 	sub.w	d0,N_Period(a4)
 	move.w	N_WantedPeriod(a4),d0
 	cmp.w	N_Period(a4),d0     	; was cmpi!!!!
-	blt.s	MT_TonePortaSetPer
+	blt.s	pt_TonePortaSetPer
 	move.w	N_WantedPeriod(a4),N_Period(a4)
 	clr.w	N_WantedPeriod(a4)
 
-MT_TonePortaSetPer:
+pt_TonePortaSetPer:
 	move.w	N_Period(a4),d2
 	move.b	N_GlissFunk(a4),d0
 	andi.b	#$0f,d0
-	beq.s	MT_GlissSkip
+	beq.s	pt_GlissSkip
 	moveq	#0,d0
 	move.b	N_FineTune(a4),d0
 	mulu	#72,d0
-	lea	MT_PeriodTable(pc),a0
+	lea	pt_PeriodTable(pc),a0
 	add.w	d0,a0
 	moveq	#0,d0
-MT_GlissLoop:
+pt_GlissLoop:
 	cmp.w	(a0,d0.w),d2
-	bhs.s	MT_GlissFound
+	bhs.s	pt_GlissFound
 	addq.w	#2,d0
 	cmpi.w	#72,d0
-	blo.s	MT_GlissLoop
+	blo.s	pt_GlissLoop
 	moveq	#70,d0
-MT_GlissFound:
+pt_GlissFound:
 	move.w	(a0,d0.w),d2
-MT_GlissSkip:
+pt_GlissSkip:
 	move.w	d2,6(a6,d5.w) ; Set period
 	rts
 
-MT_Vibrato:
+pt_Vibrato:
 	move.b	N_Cmdlo(a4),d0
-	beq.s	MT_Vibrato2
+	beq.s	pt_Vibrato2
 	move.b	N_VibratoCmd(a4),d2
 	andi.b	#$0f,d0
-	beq.s	MT_VibSkip
+	beq.s	pt_VibSkip
 	andi.b	#$f0,d2
 	or.b	d0,d2
-MT_VibSkip:
+pt_VibSkip:
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$f0,d0
-	beq.s	MT_VibSkip2
+	beq.s	pt_VibSkip2
 	andi.b	#$0f,d2
 	or.b	d0,d2
-MT_VibSkip2:
+pt_VibSkip2:
 	move.b	d2,N_VibratoCmd(a4)
-MT_Vibrato2:
+pt_Vibrato2:
 	move.b	N_VibratoPos(a4),d0
-	lea	MT_VibratoTable(pc),a0
+	lea	pt_VibratoTable(pc),a0
 	lsr.w	#2,d0
 	andi.w	#$001f,d0
 	moveq	#0,d2
 	move.b	N_WaveControl(a4),d2
 	andi.b	#$03,d2
-	beq.s	MT_Vib_Sine
+	beq.s	pt_Vib_Sine
 	lsl.b	#3,d0
 	cmpi.b	#1,d2
-	beq.s	MT_Vib_RampDown
+	beq.s	pt_Vib_RampDown
 	st	d2
-	bra.s	MT_Vib_Set
-MT_Vib_RampDown:
+	bra.s	pt_Vib_Set
+pt_Vib_RampDown:
 	tst.b	N_VibratoPos(a4)
-	bpl.s	MT_Vib_RampDown2
+	bpl.s	pt_Vib_RampDown2
 	st	d2
 	sub.b	d0,d2
-	bra.s	MT_Vib_Set
-MT_Vib_RampDown2:
+	bra.s	pt_Vib_Set
+pt_Vib_RampDown2:
 	move.b	d0,d2
-	bra.s	MT_Vib_Set
-MT_Vib_Sine:
+	bra.s	pt_Vib_Set
+pt_Vib_Sine:
 	move.b	(a0,d0.w),d2
-MT_Vib_Set:
+pt_Vib_Set:
 	move.b	N_VibratoCmd(a4),d0
 	andi.w	#15,d0
 	mulu	d0,d2
 	lsr.w	#7,d2
 	move.w	N_Period(a4),d0
 	tst.b	N_VibratoPos(a4)
-	bmi.s	MT_VibratoNeg
+	bmi.s	pt_VibratoNeg
 	add.w	d2,d0
-	bra.s	MT_Vibrato3
-MT_VibratoNeg:
+	bra.s	pt_Vibrato3
+pt_VibratoNeg:
 	sub.w	d2,d0
-MT_Vibrato3:
+pt_Vibrato3:
 	move.w	d0,6(a6,d5.w)
 	move.b	N_VibratoCmd(a4),d0
 	lsr.w	#2,d0
@@ -646,57 +638,57 @@ MT_Vibrato3:
 	add.b	d0,N_VibratoPos(a4)
 	rts
 
-MT_TonePlusVolSlide:
-	bsr	MT_TonePortNoChange
-	bra	MT_VolumeSlide
+pt_TonePlusVolSlide:
+	bsr	pt_TonePortNoChange
+	bra	pt_VolumeSlide
 
-MT_VibratoPlusVolSlide:
-	bsr.s	MT_Vibrato2
-	bra	MT_VolumeSlide
+pt_VibratoPlusVolSlide:
+	bsr.s	pt_Vibrato2
+	bra	pt_VolumeSlide
 
-MT_Tremolo:
+pt_Tremolo:
 	move.b	N_Cmdlo(a4),d0
-	beq.s	MT_Tremolo2
+	beq.s	pt_Tremolo2
 	move.b	N_TremoloCmd(a4),d2
 	andi.b	#$0f,d0
-	beq.s	MT_TreSkip
+	beq.s	pt_TreSkip
 	andi.b	#$f0,d2
 	or.b	d0,d2
-MT_TreSkip:
+pt_TreSkip:
 	move.b	N_Cmdlo(a4),d0
 	and.b	#$f0,d0
-	beq.s	MT_TreSkip2
+	beq.s	pt_TreSkip2
 	andi.b	#$0f,d2
 	or.b	d0,d2
-MT_TreSkip2:
+pt_TreSkip2:
 	move.b	d2,N_TremoloCmd(a4)
-MT_Tremolo2:
+pt_Tremolo2:
 	move.b	N_TremoloPos(a4),d0
-	lea	MT_VibratoTable(pc),a0
+	lea	pt_VibratoTable(pc),a0
 	lsr.w	#2,d0
 	andi.w	#$1f,d0
 	moveq	#0,d2
 	move.b	N_WaveControl(a4),d2
 	lsr.b	#4,d2
 	andi.b	#3,d2
-	beq.s	MT_Tre_Sine
+	beq.s	pt_Tre_Sine
 	lsl.b	#3,d0
 	cmpi.b	#1,d2
-	beq.s	MT_Tre_RampDown
+	beq.s	pt_Tre_RampDown
 	st	d2
-	bra.s	MT_Tre_Set
-MT_Tre_RampDown:
+	bra.s	pt_Tre_Set
+pt_Tre_RampDown:
 	tst.b	N_VibratoPos(a4)
-	bpl.s	MT_Tre_RampDown2
+	bpl.s	pt_Tre_RampDown2
 	st	d2
 	sub.b	d0,d2
-	bra.s	MT_Tre_Set
-MT_Tre_RampDown2:
+	bra.s	pt_Tre_Set
+pt_Tre_RampDown2:
 	move.b	d0,d2
-	bra.s	MT_Tre_Set
-MT_Tre_Sine:
+	bra.s	pt_Tre_Set
+pt_Tre_Sine:
 	move.b	(a0,d0.w),d2
-MT_Tre_Set:
+pt_Tre_Set:
 	move.b	N_TremoloCmd(a4),d0
 	andi.w	#15,d0
 	mulu	d0,d2
@@ -704,19 +696,19 @@ MT_Tre_Set:
 	moveq	#0,d0
 	move.b	N_Volume(a4),d0
 	tst.b	N_TremoloPos(a4)
-	bmi.s	MT_TremoloNeg
+	bmi.s	pt_TremoloNeg
 	add.w	d2,d0
-	bra.s	MT_Tremolo3
-MT_TremoloNeg:
+	bra.s	pt_Tremolo3
+pt_TremoloNeg:
 	sub.w	d2,d0
-MT_Tremolo3:
-	bpl.s	MT_TremoloSkip
+pt_Tremolo3:
+	bpl.s	pt_TremoloSkip
 	clr.w	d0
-MT_TremoloSkip:
+pt_TremoloSkip:
 	cmpi.w	#$40,d0
-	bls.s	MT_TremoloOk
+	bls.s	pt_TremoloOk
 	move.w	#$40,d0
-MT_TremoloOk:
+pt_TremoloOk:
 	move.w	d0,8(a6,d5.w)
 	move.b	N_TremoloCmd(a4),d0
 	lsr.w	#2,d0
@@ -724,73 +716,73 @@ MT_TremoloOk:
 	add.b	d0,N_TremoloPos(a4)
 	rts
 
-MT_SampleOffset:
+pt_SampleOffset:
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
-	beq.s	MT_SoNoNew
+	beq.s	pt_SoNoNew
 	move.b	d0,N_SampleOffset(a4)
-MT_SoNoNew:
+pt_SoNoNew:
 	move.b	N_SampleOffset(a4),d0
 	lsl.w	#7,d0
 	cmp.w	N_Length(a4),d0
-	bge.s	MT_SofSkip
+	bge.s	pt_SofSkip
 	sub.w	d0,N_Length(a4)
 	add.w	d0,d0
 	add.l	d0,N_Start(a4)
 	rts
-MT_SofSkip:
+pt_SofSkip:
 	move.w	#1,N_Length(a4)
 	rts
 
-MT_VolumeSlide:
+pt_VolumeSlide:
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	lsr.b	#4,d0
 	tst.b	d0
-	beq.s	MT_VolSlideDown
-MT_VolSlideUp:
+	beq.s	pt_VolSlideDown
+pt_VolSlideUp:
 	add.b	d0,N_Volume(a4)
 	cmpi.b	#$40,N_Volume(a4)
-	bmi.s	MT_VsuSkip
+	bmi.s	pt_VsuSkip
 	move.b	#$40,N_Volume(a4)
-MT_VsuSkip:
+pt_VsuSkip:
 	move.b	N_Volume(a4),d0
 	move.w	d0,8(a6,d5.w)
 	rts
 
-MT_VolSlideDown:
+pt_VolSlideDown:
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$0f,d0
-MT_VolSlideDown2:
+pt_VolSlideDown2:
 	sub.b	d0,N_Volume(a4)
-	bpl.s	MT_VsdSkip
+	bpl.s	pt_VsdSkip
 	clr.b	N_Volume(a4)
-MT_VsdSkip:
+pt_VsdSkip:
 	move.b	N_Volume(a4),d0
 	move.w	d0,8(a6,d5.w)
 	rts
 
-MT_PositionJump:
-	move.b	N_Cmdlo(a4),MT_SongPos(a5)
-	subq.b	#1,MT_SongPos(a5)
-MT_PJ2:
-	clr.b	MT_PBreakPos(a5)
-	st 	MT_PosJumpFlag(a5)
+pt_PositionJump:
+	move.b	N_Cmdlo(a4),pt_SongPos(a5)
+	subq.b	#1,pt_SongPos(a5)
+pt_PJ2:
+	clr.b	pt_PBreakPos(a5)
+	st 	pt_PosJumpFlag(a5)
 	rts
 
-MT_VolumeChange:
+pt_VolumeChange:
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	cmpi.b	#$40,d0
-	bls.s	MT_VolumeOk
+	bls.s	pt_VolumeOk
 	moveq	#$40,d0
-MT_VolumeOk:
+pt_VolumeOk:
 	move.b	d0,N_Volume(a4)
 	move.w	d0,8(a6,d5.w)
 	rts
 
-MT_PatternBreak:
+pt_PatternBreak:
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	move.l	d0,d2
@@ -799,72 +791,72 @@ MT_PatternBreak:
 	andi.b	#$0f,d2
 	add.b	d2,d0
 	cmpi.b	#63,d0
-	bhi.s	MT_PJ2
-	move.b	d0,MT_PBreakPos(a5)
-	st	MT_PosJumpFlag(a5)
+	bhi.s	pt_PJ2
+	move.b	d0,pt_PBreakPos(a5)
+	st	pt_PosJumpFlag(a5)
 	rts
 
-MT_SetSpeed:
+pt_SetSpeed:
 	move.b	3(a4),d0
-	beq	MT_Return2
-	clr.b	MT_Counter(a5)
-	move.b	d0,MT_Speed(a5)
+	beq	pt_Return2
+	clr.b	pt_Counter(a5)
+	move.b	d0,pt_Speed(a5)
 	rts
 
-MT_CheckMoreEfx:
-	bsr	MT_UpdateFunk
+pt_CheckMoreEfx:
+	bsr	pt_UpdateFunk
 	move.b	2(a4),d0
 	andi.b	#$0f,d0
 	cmpi.b	#$9,d0
-	beq	MT_SampleOffset
+	beq	pt_SampleOffset
 	cmpi.b	#$b,d0
-	beq	MT_PositionJump
+	beq	pt_PositionJump
 	cmpi.b	#$d,d0
-	beq.s	MT_PatternBreak
+	beq.s	pt_PatternBreak
 	cmpi.b	#$e,d0
-	beq.s	MT_E_Commands
+	beq.s	pt_E_Commands
 	cmpi.b	#$f,d0
-	beq.s	MT_SetSpeed
+	beq.s	pt_SetSpeed
 	cmpi.b	#$c,d0
-	beq	MT_VolumeChange
-	bra	MT_PerNop
+	beq	pt_VolumeChange
+	bra	pt_PerNop
 
-MT_E_Commands:
+pt_E_Commands:
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$f0,d0
 	lsr.b	#4,d0
-	beq.s	MT_FilterOnOff
+	beq.s	pt_FilterOnOff
 	cmpi.b	#1,d0
-	beq	MT_FinePortaUp
+	beq	pt_FinePortaUp
 	cmpi.b	#2,d0
-	beq	MT_FinePortaDown
+	beq	pt_FinePortaDown
 	cmpi.b	#3,d0
-	beq.s	MT_SetGlissControl
+	beq.s	pt_SetGlissControl
 	cmpi.b	#4,d0
-	beq	MT_SetVibratoControl
+	beq	pt_SetVibratoControl
 	cmpi.b	#5,d0
-	beq	MT_SetFineTune
+	beq	pt_SetFineTune
 	cmpi.b	#6,d0
-	beq	MT_JumpLoop
+	beq	pt_JumpLoop
 	cmpi.b	#7,d0
-	beq	MT_SetTremoloControl
+	beq	pt_SetTremoloControl
 	cmpi.b	#9,d0
-	beq	MT_RetrigNote
+	beq	pt_RetrigNote
 	cmpi.b	#$a,d0
-	beq	MT_VolumeFineUp
+	beq	pt_VolumeFineUp
 	cmpi.b	#$b,d0
-	beq	MT_VolumeFineDown
+	beq	pt_VolumeFineDown
 	cmpi.b	#$c,d0
-	beq	MT_NoteCut
+	beq	pt_NoteCut
 	cmpi.b	#$d,d0
-	beq	MT_NoteDelay
+	beq	pt_NoteDelay
 	cmpi.b	#$e,d0
-	beq	MT_PatternDelay
+	beq	pt_PatternDelay
 	cmpi.b	#$f,d0
-	beq	MT_FunkIt
+	beq	pt_FunkIt
 	rts
 
-MT_FilterOnOff:
+pt_FilterOnOff:
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#1,d0
 	add.b	d0,d0
@@ -872,52 +864,52 @@ MT_FilterOnOff:
 	or.b	d0,$bfe001
 	rts
 
-MT_SetGlissControl:
+pt_SetGlissControl:
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$0f,d0
 	andi.b	#$f0,N_GlissFunk(a4)
 	or.b	d0,N_GlissFunk(a4)
 	rts
 
-MT_SetVibratoControl:
+pt_SetVibratoControl:
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$0f,d0
 	andi.b	#$f0,N_WaveControl(a4)
 	or.b	d0,N_WaveControl(a4)
 	rts
 
-MT_SetFineTune:
+pt_SetFineTune:
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$0f,d0
 	move.b	d0,N_FineTune(a4)
 	rts
 
-MT_JumpLoop:
-	tst.b	MT_Counter(a5)
-	bne	MT_Return2
+pt_JumpLoop:
+	tst.b	pt_Counter(a5)
+	bne	pt_Return2
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$0f,d0
-	beq.s	MT_SetLoop
+	beq.s	pt_SetLoop
 	tst.b	N_LoopCount(a4)
-	beq.s	MT_JumpCnt
+	beq.s	pt_JumpCnt
 	subq.b	#1,N_LoopCount(a4)
-	beq	MT_Return2
-MT_JmpLoop:
-	move.b	N_PattPos(a4),MT_PBreakPos(a5)
-	st	MT_PBreakFlag(a5)
+	beq	pt_Return2
+pt_JmpLoop:
+	move.b	N_PattPos(a4),pt_PBreakPos(a5)
+	st	pt_PBreakFlag(a5)
 	rts
 
-MT_JumpCnt:
+pt_JumpCnt:
 	move.b	d0,N_LoopCount(a4)
-	bra.s	MT_JmpLoop
+	bra.s	pt_JmpLoop
 
-MT_SetLoop:
-	move.w	MT_PatternPos(a5),d0
+pt_SetLoop:
+	move.w	pt_PatternPos(a5),d0
 	lsr.w	#4,d0
 	move.b	d0,N_PattPos(a4)
 	rts
 
-MT_SetTremoloControl:
+pt_SetTremoloControl:
 	move.b	N_Cmdlo(a4),d0
 *	andi.b	#$0f,d0
 	lsl.b	#4,d0
@@ -925,111 +917,111 @@ MT_SetTremoloControl:
 	or.b	d0,N_WaveControl(a4)
 	rts
 
-MT_RetrigNote:
+pt_RetrigNote:
 	move.l	d1,-(a7)
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$0f,d0
-	beq.s	MT_RtnEnd
+	beq.s	pt_RtnEnd
 	moveq	#0,d1
-	move.b	MT_Counter(a5),d1
-	bne.s	MT_RtnSkp
+	move.b	pt_Counter(a5),d1
+	bne.s	pt_RtnSkp
 	move.w	(a4),d1
 	andi.w	#$0fff,d1
-	bne.s	MT_RtnEnd
+	bne.s	pt_RtnEnd
 	moveq	#0,d1
-	move.b	MT_Counter(a5),d1
-MT_RtnSkp:
+	move.b	pt_Counter(a5),d1
+pt_RtnSkp:
 	divu	d0,d1
 	swap	d1
 	tst.w	d1
-	bne.s	MT_RtnEnd
-MT_DoRetrig:
+	bne.s	pt_RtnEnd
+pt_DoRetrig:
 	move.w	N_DMABit(a4),$096(a6)	; Channel DMA off
 	move.l	N_Start(a4),(a6,d5.w)	; Set sampledata pointer
 	move.w	N_Length(a4),4(a6,d5.w)	; Set length
-	bsr	MT_DMAWaitLoop
+	bsr	pt_DMAWaitLoop
 	move.w	N_DMABit(a4),d0
 	ori.w	#$8000,d0
 *	bset	#15,d0
 	move.w	d0,$096(a6)
-	bsr	MT_DMAWaitLoop
+	bsr	pt_DMAWaitLoop
 	move.l	N_LoopStart(a4),(a6,d5.w)
 	move.l	N_Replen(a4),4(a6,d5.w)
-MT_RtnEnd:
+pt_RtnEnd:
 	move.l	(a7)+,d1
 	rts
 
-MT_VolumeFineUp:
-	tst.b	MT_Counter(a5)
-	bne	MT_Return2
+pt_VolumeFineUp:
+	tst.b	pt_Counter(a5)
+	bne	pt_Return2
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$d,d0
-	bra	MT_VolSlideUp
+	bra	pt_VolSlideUp
 
-MT_VolumeFineDown:
-	tst.b	MT_Counter(a5)
-	bne	MT_Return2
+pt_VolumeFineDown:
+	tst.b	pt_Counter(a5)
+	bne	pt_Return2
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$0f,d0
-	bra	MT_VolSlideDown2
+	bra	pt_VolSlideDown2
 
-MT_NoteCut:
+pt_NoteCut:
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$0f,d0
-	cmp.b	MT_Counter(a5),d0   ; was cmpi!!!
-	bne	MT_Return2
+	cmp.b	pt_Counter(a5),d0   ; was cmpi!!!
+	bne	pt_Return2
 	clr.b	N_Volume(a4)
 	clr.w	8(a6,d5.w)
 	rts
 
-MT_NoteDelay:
+pt_NoteDelay:
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$0f,d0
-	cmp.b	MT_Counter(a5),d0   ; was cmpi!!!
-	bne	MT_Return2
+	cmp.b	pt_Counter(a5),d0   ; was cmpi!!!
+	bne	pt_Return2
 	move.w	(a4),d0
-	beq	MT_Return2
+	beq	pt_Return2
 	move.l	d1,-(a7)
-	bra	MT_DoRetrig
+	bra	pt_DoRetrig
 
-MT_PatternDelay:
-	tst.b	MT_Counter(a5)
-	bne	MT_Return2
+pt_PatternDelay:
+	tst.b	pt_Counter(a5)
+	bne	pt_Return2
 	moveq	#0,d0
 	move.b	N_Cmdlo(a4),d0
 	andi.b	#$0f,d0
-	tst.b	MT_PattDelTime2(a5)
-	bne	MT_Return2
+	tst.b	pt_PattDelTime2(a5)
+	bne	pt_Return2
 	addq.b	#1,d0
-	move.b	d0,MT_PattDelTime(a5)
+	move.b	d0,pt_PattDelTime(a5)
 	rts
 
-MT_FunkIt:
-	tst.b	MT_Counter(a5)
-	bne	MT_Return2
+pt_FunkIt:
+	tst.b	pt_Counter(a5)
+	bne	pt_Return2
 	move.b	N_Cmdlo(a4),d0
 *	andi.b	#$0f,d0
 	lsl.b	#4,d0
 	andi.b	#$0f,N_GlissFunk(a4)
 	or.b	d0,N_GlissFunk(a4)
 	tst.b	d0
-	beq	MT_Return2
-MT_UpdateFunk:
+	beq	pt_Return2
+pt_UpdateFunk:
 	movem.l	a0/d1,-(a7)
 	moveq	#0,d0
 	move.b	N_GlissFunk(a4),d0
 	lsr.b	#4,d0
-	beq.s	MT_FunkEnd
-	lea	MT_FunkTable(pc),a0
+	beq.s	pt_FunkEnd
+	lea	pt_FunkTable(pc),a0
 	move.b	(a0,d0.w),d0
 	add.b	d0,N_FunkOffset(a4)
 	btst	#7,N_FunkOffset(a4)
-	beq.s	MT_FunkEnd
+	beq.s	pt_FunkEnd
 	clr.b	N_FunkOffset(a4)
 
 	move.l	N_LoopStart(a4),d0
@@ -1040,18 +1032,18 @@ MT_UpdateFunk:
 	move.l	N_WaveStart(a4),a0
 	addq.w	#1,a0
 	cmp.l	d0,a0
-	blo.s	MT_FunkOk
+	blo.s	pt_FunkOk
 	move.l	N_LoopStart(a4),a0
-MT_FunkOk:
+pt_FunkOk:
 	move.l	a0,N_WaveStart(a4)
 	moveq	#-1,d0
 	sub.b	(a0),d0
 	move.b	d0,(a0)
-MT_FunkEnd:
+pt_FunkEnd:
 	movem.l	(a7)+,a0/d1
 	rts
 
-MT_DMAWaitLoop:
+pt_DMAWaitLoop:
 	move.w	d1,-(sp)
 	moveq	#5,d0		; wait 5+1 lines
 .loop	move.b	6(a6),d1		; read current raster position
@@ -1062,15 +1054,15 @@ MT_DMAWaitLoop:
 	rts
 
 
-MT_FunkTable: dc.b 0,5,6,7,8,10,11,13,16,19,22,26,32,43,64,128
+pt_FunkTable: dc.b 0,5,6,7,8,10,11,13,16,19,22,26,32,43,64,128
 
-MT_VibratoTable:
+pt_VibratoTable:
 	dc.b 0, 24, 49, 74, 97,120,141,161
 	dc.b 180,197,212,224,235,244,250,253
 	dc.b 255,253,250,244,235,224,212,197
 	dc.b 180,161,141,120, 97, 74, 49, 24
 
-MT_PeriodTable:
+pt_PeriodTable:
 ; Tuning 0, Normal
 	dc.w	856,808,762,720,678,640,604,570,538,508,480,453
 	dc.w	428,404,381,360,339,320,302,285,269,254,240,226
@@ -1136,39 +1128,39 @@ MT_PeriodTable:
 	dc.w	431,407,384,363,342,323,305,288,272,256,242,228
 	dc.w	216,203,192,181,171,161,152,144,136,128,121,114
 
-MT_Chan1Temp:
+pt_Chan1Temp:
 	dc.l	0,0,0,0,0,$00010000,0,0,0,0,0
-MT_Chan2Temp:
+pt_Chan2Temp:
 	dc.l	0,0,0,0,0,$00020000,0,0,0,0,0
-MT_Chan3Temp:
+pt_Chan3Temp:
 	dc.l	0,0,0,0,0,$00040000,0,0,0,0,0
-MT_Chan4Temp:
+pt_Chan4Temp:
 	dc.l	0,0,0,0,0,$00080000,0,0,0,0,0
-MT_SampleStarts:
+pt_SampleStarts:
 	dc.l	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 	dc.l	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-*MT_SongDataPtr:
+*pt_SongDataPtr:
 	dc.l 0
-*MT_Speed:
+*pt_Speed:
 	dc.b 6
-*MT_Counter:
+*pt_Counter:
 	dc.b 0
-*MT_SongPos:
+*pt_SongPos:
 	dc.b 0
-*MT_PBreakPos:
+*pt_PBreakPos:
 	dc.b 0
-*MT_PosJumpFlag:
+*pt_PosJumpFlag:
 	dc.b 0
-*MT_PBreakFlag:
+*pt_PBreakFlag:
 	dc.b 0
-*MT_LowMask:
+*pt_LowMask:
 	dc.b 0
-*MT_PattDelTime:
+*pt_PattDelTime:
 	dc.b 0
-*MT_PattDelTime2:
+*pt_PattDelTime2:
 	dc.b 0,0
-*MT_PatternPos:
+*pt_PatternPos:
 	dc.w 0
-*MT_DMACONtemp:
+*pt_DMACONtemp:
 	dc.w 0
 Variables:
