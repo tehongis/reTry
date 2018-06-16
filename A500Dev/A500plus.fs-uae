@@ -1,7 +1,0 @@
-amiga_model=A500+
-chip_memory=1024
-slow_memory=1024
-cpu=68000
-kickstart_file=/home/thongisto/Asiakirjat/FS-UAE/Kickstarts/Kickstart v2.04 rev 37.175 (1991)(Commodore)(A500+).rom
-hard_drive_0=DevHDD
-
