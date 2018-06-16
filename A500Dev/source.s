@@ -5,7 +5,7 @@
 	section maincode,code
 
 main
-	move.l	#CUSTOM,a6
+	lea			CUSTOM,a6
 	move.w  #%1000000110000000,DMACON(a6)
 	move.w  #%0000000001111111,DMACON(a6)
 	move.w  #%1100000000000000,INTENA(a6)
@@ -15,6 +15,8 @@ main
 	move.l	a0,COP1LCH(a6)
 
 .mainloop
+	move.w	#$0000,COLOR0(a6)
+	move.w	#$0000,COLOR1(a6)
 	bra .mainloop
 
 irq
