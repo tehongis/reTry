@@ -1,0 +1,8 @@
+cmd: vasmm68k_mot_win32
+name: demo
+args:
+   -devpac
+   -Fhunkexe
+   -o demo.exe
+   {FILE_ACTIVE}
+sh: true
