@@ -75,6 +75,32 @@ main
 	move.l	a0,COP1LCH(a6)
 	move.w	#0,COPJMP1(a6)
 
+	lea		bitmaps,a1
+	move.l	a1,d0
+	add.l	#38,a0		;bitmap pointers begin
+
+	move.w	d0,(a0)
+	swap	d0
+	add.l	#4,a0
+	move.w	d0,(a0)
+	swap	d0
+	add.l	#4,a0
+	add.l	#$50,d0
+	move.w	d0,(a0)
+	swap	d0
+	add.l	#4,a0
+	move.w	d0,(a0)
+	swap	d0
+	add.l	#4,a0
+	add.l	#$50,d0
+	move.w	d0,(a0)
+	swap	d0
+	add.l	#4,a0
+	move.w	d0,(a0)
+	swap	d0
+	add.l	#4,a0
+
+
 	move.w	#%1000010111001111,DMACON(a6)
 
 .mainloop
@@ -88,6 +114,21 @@ myVBI
 	movem.l	d0-d7/a0-a6,-(sp)
 
 	jsr		pt_Music
+
+	move.w	sinecounter1,d0
+	add.w	#8,d0
+	and.w	#$0ffe,d0
+	move.w	d0,sinecounter1
+	lea		sinus,a0
+	add.w	d0,a0
+	move.w	(a0),d0
+	add.w	#$100,d0
+	muls.w	#$28,d0
+
+	lea		bitmaps,a1
+	add.w	d0,a1
+	eor.b	#$ff,(a1)
+;No use for sine yet.
 
 	lea		customBase,a6
 	move.w	#%0000000000100000,INTREQ(a6)
@@ -113,6 +154,11 @@ oldVBI
 	dc.l	0
 gfxBase
 	dc.l	0
+sinecounter1
+	dc.w	0
+sinus
+	include "okxu.i"
+
 gfxName
 	dc.b	"graphics.library",0
 	even
@@ -128,26 +174,31 @@ myCopper
 	dc.w	BPLCON1,$0000
 	dc.w	BPL1MOD,$0050
 	dc.w	BPL2MOD,$0050
-	dc.w	BPL1PTH,$0000
+
 	dc.w	BPL1PTL,$0000
-	dc.w	BPL2PTH,$0000
+	dc.w	BPL1PTH,$0000
 	dc.w	BPL2PTL,$0000
-	dc.w	BPL3PTH,$0000
+	dc.w	BPL2PTH,$0000
 	dc.w	BPL3PTL,$0000
+	dc.w	BPL3PTH,$0000
 
 	dc.w	COLOR0,$0000
 	dc.w	COLOR1,$0fff
-	dc.w	$6f11,$fffe
+
+	dc.w	$1f11,$fffe
 	dc.w	COLOR0,$0fff
-	dc.w	COLOR1,$0000
-	dc.w	$ef11,$fffe
+	dc.w	$2011,$fffe
 	dc.w	COLOR0,$0000
-	dc.w	COLOR1,$0fff
 	dc.w	$ffdf,$fffe		;Over the VPOS max...
+	dc.w	$2111,$fffe
+	dc.w	COLOR0,$0fff
+	dc.w	$2211,$fffe
+	dc.w	COLOR0,$0000
+
 	dc.w	$ffff,$fffe
 
 pt_module
-	incbin	"f-tube.mod"
+	incbin	"modules/MOD.heatbeat's theme"
 
 bitmaps
 	ds.b	(320*256*3)/8
