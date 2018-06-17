@@ -11,6 +11,7 @@ customBase	equ $dff000
 	section maincode,CODE
 
 main
+	move.l	execBase.l,a6
 	lea		gfxName,a1
 	move.l	#$0,d0
 	jsr		_LVOOpenLibrary(a6)
