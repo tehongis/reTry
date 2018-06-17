@@ -52,11 +52,11 @@ main
 	move.l	gfxBase,a6
 	jsr		_LVOWaitBlit(a6)
 
-;	move.l	gfxBase,a6
-;	move.l	#0,a1
-;	jsr		_LVOLoadView(a6)
-;	jsr 	_LVOWaitTOF(a6)
-;	jsr 	_LVOWaitTOF(a6)
+	move.l	gfxBase,a6
+	move.l	#0,a1
+	jsr		_LVOLoadView(a6)
+	jsr 	_LVOWaitTOF(a6)
+	jsr 	_LVOWaitTOF(a6)
 
 	lea		pt_module,a0
 	jsr 	pt_Init
@@ -69,9 +69,13 @@ main
 	move.w	#$8020,INTENA(a6)
 
 	lea		customBase,a6
+	move.w	#%0000010111111111,DMACON(a6)
+
 	lea		myCopper,a0
 	move.l	a0,COP1LCH(a6)
 	move.w	#0,COPJMP1(a6)
+
+	move.w	#%1000010111001111,DMACON(a6)
 
 .mainloop
 	bra 	.mainloop
