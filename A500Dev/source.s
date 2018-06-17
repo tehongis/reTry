@@ -1,76 +1,104 @@
 ; Code by Tero Hongisto
 ; CodeVacation 2018
-; This is ugly as hell. We just go and kill the OS with not even intending to get back...
+; "I never wanted to exit to the OS anyway..."
 
 	include LVOs.i
 	include Hards.i
 
-EXECBASE equ $4
+execBase 	equ $4
+customBase	equ $dff000
 
 	section maincode,CODE
 
 main
+	lea		gfxName,a1
+	move.l	#$0,d0
+	jsr		_LVOOpenLibrary(a6)
+	move.l	d0,gfxBase
+	cmp		#0,d0
+	beq		.fail
+
+	move.l	gfxBase,a6
+	move.l 	34(a6),oldView
+	move.l 	38(a6),oldCopper
+
+	move.l	gfxBase,a6
+	move.l	#0,a1
+	jsr		_LVOLoadView(a6)
+	jsr 	_LVOWaitTOF(a6)
+	jsr 	_LVOWaitTOF(a6)
+
+	move.l	execBase.l,a6
+	jsr		_LVOForbid(a6)
+	jsr		_LVODisable(a6)
+
+	lea		customBase,a4
+	move.w	DMACONR(a4),d0
+	or.w	#$8000,d0
+	move.w	d0,oldDMACon
+	move.w	INTENAR(a4),d0
+	or.w	#$8000,d0
+	move.w	d0,oldIntEna
+	move.w	INTREQR(a4),d0
+	or.w	#$8000,d0
+	move.w	d0,oldIntReq
+	move.w	ADKCONR(a4),d0
+	or.w	#$8000,d0
+	move.w	d0,oldAdkCon
+
+	move.w  #%1000000110000000,DMACON(a4)
+	move.w  #%0000000001111111,DMACON(a4)
+	move.w  #%1100000000000000,INTENA(a4)
+	move.w  #%0011111111111111,INTENA(a4)
+
+
+	lea		myCopper,a0
+	move.l	a0,COP1LCH(a4)
 
 	lea		pt_module,a0
 	jsr 	pt_Init
 
-	move.l	EXECBASE.l,a6
-	jsr		_LVODisable(a6)
-
-;	jsr		initscreen
-	jsr		initVBI
-
 .mainloop
-	bra .mainloop
+	bra 	.mainloop
+.fail
+	rts		;JUST in case... ;-)
 
-initscreen
-
-	lea			CUSTOM,a6
-	move.w  #%1000000110000000,DMACON(a6)
-	move.w  #%0000000001111111,DMACON(a6)
-
-	lea			myCopper,a0
-	move.l	a0,COP1LCH(a6)
-	move.l	#$0000,COP1JUMP(a6)
-
-	rts
-
-initVBI
-
-	move.w  #%1100000000000000,INTENA(a6)
-	move.w  #%0011111111111111,INTENA(a6)
-
-	rts
+;-------------------
 
 myVBI
-
 	movem.l	d0-d7/a0-a6,-(sp)
 
-	jsr			pt_Music
+	jsr		pt_Music
 
-	lea			CUSTOM,a6
-	move.w	#%0000000000100000,INTREQ(a6)
+	lea		customBase,a4
+	move.w	#%0000000000100000,INTREQ(a4)
 
 	movem.l	(sp)+,d0-d7/a0-a6
 	rte
 
 	include protracker_replay.s
 
-OLD_DMACON
+oldDMACon
 	dc.l	0
-OLD_INTENA
+oldIntEna
 	dc.l	0
-OLD_INTREQ
+oldIntReq
 	dc.l	0
-OLD_ADKCON
+oldAdkCon
 	dc.l	0
+oldView
+	dc.l	0
+oldCopper
+	dc.l	0
+gfxBase
+	dc.l	0
+gfxName
+	dc.b	"graphics.library",0
+	even
 
 		section chipdata,DATA_C
-pt_module
-	incbin	"f-tube.mod"
-
 myCopper
-	dc.w  $3200,BPLCON0
+	dc.w	$3200,BPLCON0
 	dc.w	$0000,BPLCON1
 	dc.w	$0050,BPL1MOD
 	dc.w	$0050,BPL2MOD
@@ -87,5 +115,19 @@ myCopper
 	dc.w	$00d0,DDFSTOP
 	dc.w	$0000,COLOR0
 	dc.w	$0fff,COLOR1
+	dc.w	$6f00,$fffe
+	dc.w	$0fff,COLOR0
+	dc.w	$0000,COLOR1
+	dc.w	$ef00,$fffe
+	dc.w	$0000,COLOR0
+	dc.w	$0fff,COLOR1
 	dc.w	$ffff,$fffe
 	dc.w	$ffff,$fffe
+
+pt_module
+	incbin	"f-tube.mod"
+
+bitmaps
+	ds.b	(320*256*3)/8
+
+	end

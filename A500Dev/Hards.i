@@ -1,5 +1,3 @@
-CUSTOM		equ	$DFF000
-
 JOY0DAT		equ	$00a
 JOY1DAT		equ	$00c
 
@@ -185,4 +183,3 @@ COLOR28		equ	$1b8
 COLOR29		equ	$1ba
 COLOR30		equ	$1bc
 COLOR31		equ	$1be
-

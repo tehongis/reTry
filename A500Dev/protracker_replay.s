@@ -70,7 +70,7 @@ pt_DMACONTemp = -2
 
 pt_Init:
 	lea			Variables,a5
-	lea			CUSTOM,a6
+	lea			$dff000,a6
 	move.l	a0,pt_SongDataPtr(a5)
 	lea			952(a0),a1
 	moveq		#127,D0
