@@ -117,32 +117,32 @@ gfxName
 	dc.b	"graphics.library",0
 	even
 
-		section chipdata,DATA_C
+		section chipdata,data_C
 myCopper
 	dc.w	$0011,$fffe
-	dc.w	$3200,BPLCON0
-	dc.w	$0000,BPLCON1
-	dc.w	$0050,BPL1MOD
-	dc.w	$0050,BPL2MOD
-	dc.w	$0000,BPL1PTH
-	dc.w	$0000,BPL1PTL
-	dc.w	$0000,BPL2PTH
-	dc.w	$0000,BPL2PTL
-	dc.w	$0000,BPL3PTH
-	dc.w	$0000,BPL3PTL
+	dc.w	DIWSTRT,$2c81
+	dc.w	DIWSTOP,$c8d1
+	dc.w	DDFSTRT,$0038
+	dc.w	DDFSTOP,$00d0
+	dc.w	BPLCON0,$3200
+	dc.w	BPLCON1,$0000
+	dc.w	BPL1MOD,$0050
+	dc.w	BPL2MOD,$0050
+	dc.w	BPL1PTH,$0000
+	dc.w	BPL1PTL,$0000
+	dc.w	BPL2PTH,$0000
+	dc.w	BPL2PTL,$0000
+	dc.w	BPL3PTH,$0000
+	dc.w	BPL3PTL,$0000
 
-	dc.w	$2c81,DIWSTRT
-	dc.w	$c8d1,DIWSTOP
-	dc.w	$0038,DDFSTRT
-	dc.w	$00d0,DDFSTOP
-	dc.w	$0000,COLOR0
-	dc.w	$0fff,COLOR1
+	dc.w	COLOR0,$0000
+	dc.w	COLOR1,$0fff
 	dc.w	$6f11,$fffe
-	dc.w	$0fff,COLOR0
-	dc.w	$0000,COLOR1
+	dc.w	COLOR0,$0fff
+	dc.w	COLOR1,$0000
 	dc.w	$ef11,$fffe
-	dc.w	$0000,COLOR0
-	dc.w	$0fff,COLOR1
+	dc.w	COLOR0,$0000
+	dc.w	COLOR1,$0fff
 	dc.w	$ffff,$fffe
 	dc.w	$ffff,$fffe
 
