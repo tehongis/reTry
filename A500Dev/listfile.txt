@@ -3601,8 +3601,8 @@ F00:0144       	dc.w	COLOR0,$0000
 F00:0145       	dc.w	COLOR1,$0fff
                S02:00000058:  01 82
                S02:0000005A:  0F FF
-F00:0146       	dc.w	$ffff,$fffe
-               S02:0000005C:  FF FF
+F00:0146       	dc.w	$ffdf,$fffe		;Over the VPOS max...
+               S02:0000005C:  FF DF
                S02:0000005E:  FF FE
 F00:0147       	dc.w	$ffff,$fffe
                S02:00000060:  FF FF

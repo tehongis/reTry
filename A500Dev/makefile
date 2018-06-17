@@ -4,7 +4,9 @@ ifeq ($(OS),Windows_NT)
 	VASM=vasmm68k_mot_win32
 	#OPTS=  -Fhunkexe -kick1hunks -devpac -nosym
 	OPTS=  -Fhunkexe -devpac -nosym -L listfile.txt
-	OUTFILE = "C:\Users\Public\Documents\Amiga Files\WinUAE\Harddrives\DevHDD\demo.exe"
+	#OUTFILE = "C:\Users\Public\Documents\Amiga Files\WinUAE\Harddrives\DevHDD\demo.exe"
+	OUTFILE = "HDD\c\demo.exe"
+
 else
 	OSFLAG += -D LINUX
 	VASM=vasmm68k_mot
