@@ -14,7 +14,7 @@ main
 	lea		pt_module,a0
 	jsr 	pt_Init
 
-	lea		EXECBASE,a6
+	move.l	EXECBASE.l,a6
 	jsr		_LVODisable(a6)
 
 ;	jsr		initscreen
@@ -31,6 +31,7 @@ initscreen
 
 	lea			myCopper,a0
 	move.l	a0,COP1LCH(a6)
+	move.l	#$0000,COP1JUMP(a6)
 
 	rts
 
@@ -38,9 +39,6 @@ initVBI
 
 	move.w  #%1100000000000000,INTENA(a6)
 	move.w  #%0011111111111111,INTENA(a6)
-
-
-
 
 	rts
 
