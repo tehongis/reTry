@@ -143,7 +143,7 @@ myCopper
 	dc.w	$ef11,$fffe
 	dc.w	COLOR0,$0000
 	dc.w	COLOR1,$0fff
-	dc.w	$ffff,$fffe
+	dc.w	$ffdf,$fffe		;Over the VPOS max...
 	dc.w	$ffff,$fffe
 
 pt_module
