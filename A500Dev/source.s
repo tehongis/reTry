@@ -11,6 +11,7 @@ customBase	equ $dff000
 	section maincode,CODE
 
 main
+
 	move.l	execBase.l,a6
 	lea		gfxName,a1
 	move.l	#$0,d0
@@ -23,47 +24,54 @@ main
 	move.l 	34(a6),oldView
 	move.l 	38(a6),oldCopper
 
-	lea		customBase,a4
-	move.w	DMACONR(a4),d0
+	move.l	execBase.l,a6
+	jsr		_LVOForbid(a6)
+
+	lea		customBase,a6
+
+	move.w	DMACONR(a6),d0
 	or.w	#$8000,d0
 	move.w	d0,oldDMACon
-	move.w	INTENAR(a4),d0
+
+	move.w	INTENAR(a6),d0
 	or.w	#$8000,d0
 	move.w	d0,oldIntEna
-	move.w	INTREQR(a4),d0
+
+	move.w	INTREQR(a6),d0
 	or.w	#$8000,d0
 	move.w	d0,oldIntReq
-	move.w	ADKCONR(a4),d0
+
+	move.w	ADKCONR(a6),d0
 	or.w	#$8000,d0
 	move.w	d0,oldAdkCon
 
-	move.l	$6c,oldVBI
+	move.l	$6c.l,oldVBI
 
 	move.l	gfxBase,a6
-	move.l	#0,a1
-	jsr		_LVOLoadView(a6)
-	jsr 	_LVOWaitTOF(a6)
-	jsr 	_LVOWaitTOF(a6)
+	jsr		_LVOOwnBlitter(a6)
+	move.l	gfxBase,a6
+	jsr		_LVOWaitBlit(a6)
 
-	move.l	execBase.l,a6
-	jsr		_LVOForbid(a6)
-;	jsr		_LVODisable(a6)
-
-;	move.w  #%1000010111001111,DMACON(a4)
-
-	move.w  #%0011111111111111,INTENA(a4)
-	lea		myVBI,a0
-	move.l	a0,$6c
-	move.w  #%1000000000100000,INTENA(a4)
+;	move.l	gfxBase,a6
+;	move.l	#0,a1
+;	jsr		_LVOLoadView(a6)
+;	jsr 	_LVOWaitTOF(a6)
+;	jsr 	_LVOWaitTOF(a6)
 
 	lea		pt_module,a0
 	jsr 	pt_Init
 
-	lea		customBase,a4
-	lea		myCopper,a0
-	move.l	a0,COP1LCH(a4)
-;	move.w	#0,COPJMP1(a4)
+	lea		customBase,a6
 
+	move.w	#$3fff,INTENA(a6)
+	lea		myVBI,a0
+	move.l	a0,$6c.l
+	move.w	#$8020,INTENA(a6)
+
+	lea		customBase,a6
+	lea		myCopper,a0
+	move.l	a0,COP1LCH(a6)
+	move.w	#0,COPJMP1(a6)
 
 .mainloop
 	bra 	.mainloop
@@ -107,6 +115,7 @@ gfxName
 
 		section chipdata,DATA_C
 myCopper
+	dc.w	$0011,$fffe
 	dc.w	$3200,BPLCON0
 	dc.w	$0000,BPLCON1
 	dc.w	$0050,BPL1MOD
