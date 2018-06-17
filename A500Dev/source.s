@@ -23,16 +23,6 @@ main
 	move.l 	34(a6),oldView
 	move.l 	38(a6),oldCopper
 
-	move.l	gfxBase,a6
-	move.l	#0,a1
-	jsr		_LVOLoadView(a6)
-	jsr 	_LVOWaitTOF(a6)
-	jsr 	_LVOWaitTOF(a6)
-
-	move.l	execBase.l,a6
-	jsr		_LVOForbid(a6)
-	jsr		_LVODisable(a6)
-
 	lea		customBase,a4
 	move.w	DMACONR(a4),d0
 	or.w	#$8000,d0
@@ -47,17 +37,33 @@ main
 	or.w	#$8000,d0
 	move.w	d0,oldAdkCon
 
-	move.w  #%1000000110000000,DMACON(a4)
-	move.w  #%0000000001111111,DMACON(a4)
-	move.w  #%1100000000000000,INTENA(a4)
+	move.l	$6c,oldVBI
+
+	move.l	gfxBase,a6
+	move.l	#0,a1
+	jsr		_LVOLoadView(a6)
+	jsr 	_LVOWaitTOF(a6)
+	jsr 	_LVOWaitTOF(a6)
+
+	move.l	execBase.l,a6
+	jsr		_LVOForbid(a6)
+;	jsr		_LVODisable(a6)
+
+;	move.w  #%1000010111001111,DMACON(a4)
+
 	move.w  #%0011111111111111,INTENA(a4)
-
-
-	lea		myCopper,a0
-	move.l	a0,COP1LCH(a4)
+	lea		myVBI,a0
+	move.l	a0,$6c
+	move.w  #%1000000000100000,INTENA(a4)
 
 	lea		pt_module,a0
 	jsr 	pt_Init
+
+	lea		customBase,a4
+	lea		myCopper,a0
+	move.l	a0,COP1LCH(a4)
+;	move.w	#0,COPJMP1(a4)
+
 
 .mainloop
 	bra 	.mainloop
@@ -71,8 +77,8 @@ myVBI
 
 	jsr		pt_Music
 
-	lea		customBase,a4
-	move.w	#%0000000000100000,INTREQ(a4)
+	lea		customBase,a6
+	move.w	#%0000000000100000,INTREQ(a6)
 
 	movem.l	(sp)+,d0-d7/a0-a6
 	rte
@@ -90,6 +96,8 @@ oldAdkCon
 oldView
 	dc.l	0
 oldCopper
+	dc.l	0
+oldVBI
 	dc.l	0
 gfxBase
 	dc.l	0
@@ -116,10 +124,10 @@ myCopper
 	dc.w	$00d0,DDFSTOP
 	dc.w	$0000,COLOR0
 	dc.w	$0fff,COLOR1
-	dc.w	$6f00,$fffe
+	dc.w	$6f11,$fffe
 	dc.w	$0fff,COLOR0
 	dc.w	$0000,COLOR1
-	dc.w	$ef00,$fffe
+	dc.w	$ef11,$fffe
 	dc.w	$0000,COLOR0
 	dc.w	$0fff,COLOR1
 	dc.w	$ffff,$fffe
