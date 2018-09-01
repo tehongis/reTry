@@ -4,6 +4,7 @@ var outsideRadius = 150;
 var insideRadius = 100;
 var counter1 = 0;
 var counter2 = 0;
+var counter3 = 1;
 
 function preload() {
   soundFormats("mp3");
@@ -25,29 +26,14 @@ function setup() {
 function draw() {
   background(0);
 
-  var numPoints = int(map(mouseX, 0, width, 6, 60));
-  var angle = 0;
-  var angleStep = 180.0/numPoints;
-
-  beginShape(TRIANGLE_STRIP);
-  for (var i = 0; i <= numPoints; i++) {
-    var px = x + cos(radians(angle)) * outsideRadius;
-    var py = y + sin(radians(angle)) * outsideRadius;
-    angle += angleStep;
-    vertex(px, py);
-    px = x + cos(radians(angle)) * insideRadius;
-    py = y + sin(radians(angle)) * insideRadius;
-    vertex(px, py);
-    angle += angleStep;
-  }
-  endShape();
-
   imageMode(CENTER);
 
   x_location = x + (sin(counter1) * (width/2));
   y_location = y + (sin(counter2) * (height/4));
+  y2_location = y + (sin(counter3) * (height/4));
 
   image(colors, x, y_location,width,colors.height*2);
+  image(colors, x, y2_location,width,colors.height*2);
   image(logo, x_location, y);
 
   counter1 += 0.02;
@@ -57,6 +43,10 @@ function draw() {
   counter2 += 0.04;
   if ( counter2 > PI*2 ) {
       counter2 -= PI*2;
+  }
+  counter3 += 0.04;
+  if ( counter3 > PI*2 ) {
+      counter3 -= PI*2;
   }
 
 }
