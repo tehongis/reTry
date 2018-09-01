@@ -2,8 +2,8 @@ var x;
 var y;
 var outsideRadius = 150;
 var insideRadius = 100;
-var counter1 = 0.0;
-var counter2 = 0.0;
+var counter1 = 0;
+var counter2 = 0;
 
 function preload() {
   soundFormats("mp3");
@@ -44,8 +44,8 @@ function draw() {
 
   imageMode(CENTER);
 
-  x_location = x + (sin(counter1) * width)
-  y_location = y + (sin(counter2) * height)
+  x_location = x + (sin(counter1) * width);
+  y_location = y + (sin(counter2) * height);
 
   image(logo, x_location, y);
   image(colors, x, y_location);
