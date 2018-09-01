@@ -2,11 +2,13 @@ var x;
 var y;
 var outsideRadius = 150;
 var insideRadius = 100;
+var counter = 0.0;
 
 function preload() {
   soundFormats("mp3");
   mySound = loadSound("assets/MRT - Phat Frog.mp3");
-  logo = loadImage("assets/retry_logo.png");
+  logo = loadImage("assets/retry.png");
+  colors = loadImage("assets/colors.png");
 }
 
 function setup() {
@@ -38,7 +40,22 @@ function draw() {
     angle += angleStep;
   }
   endShape();
+
   imageMode(CENTER);
-  image(logo, x, y);
+
+  x_location = x + (sin(counter1) * width)
+  y_location = y + (sin(counter2) * height)
+
+  image(logo, x_location, y);
+  image(colors, x, y_location);
+
+  counter1 += 0.02;
+  if counter1 > PI*2 {
+      counter1 -= PI*2;
+  }
+  counter2 += 0.04;
+  if counter2 > PI*2 {
+      counter2 -= PI*2;
+  }
 
 }
