@@ -6,6 +6,7 @@ var insideRadius = 100;
 function preload() {
   soundFormats("mp3");
   mySound = loadSound("assets/MRT - Phat Frog.mp3");
+  logo = loadImage("assets/retry_logo.png");
 }
 
 function setup() {
@@ -37,4 +38,7 @@ function draw() {
     angle += angleStep;
   }
   endShape();
+  imageMode(CENTER);
+  image(logo, x, y);
+
 }
