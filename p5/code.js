@@ -44,11 +44,11 @@ function draw() {
 
   imageMode(CENTER);
 
-  x_location = x + (sin(counter1) * width);
-  y_location = y + (sin(counter2) * height);
+  x_location = x + (sin(counter1) * (width/2));
+  y_location = y + (sin(counter2) * (height/2));
 
+  image(colors, 0, y_location,width,colors.height);
   image(logo, x_location, y);
-  image(colors, x, y_location);
 
   counter1 += 0.02;
   if ( counter1 > PI*2 ) {
