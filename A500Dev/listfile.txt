@@ -787,7 +787,7 @@ F00:0076       	move.w	#0,COPJMP1(a6)
                S01:000000F8:  3D 7C 00 00 00 88
 F00:0077       
 F00:0078       	lea		bitmaps,a1
-               S01:000000FE:  43 F9 00 00 28 6C [R]
+               S01:000000FE:  43 F9 00 00 31 7E [R]
 F00:0079       	move.l	a1,d0
                S01:00000104:  20 09
 F00:0080       	add.l	#38,a0		;bitmap pointers begin
@@ -874,7 +874,7 @@ F00:0126       	muls.w	#$28,d0
                S01:0000018C:  C1 FC 00 28
 F00:0127       
 F00:0128       	lea		bitmaps,a1
-               S01:00000190:  43 F9 00 00 28 6C [R]
+               S01:00000190:  43 F9 00 00 31 7E [R]
 F00:0129       	add.w	d0,a1
                S01:00000196:  D2 C0
 F00:0130       	eor.b	#$ff,(a1)
@@ -5921,9 +5921,9 @@ F00:0198       	dc.w	$ffff,$fffe
                S02:0000006A:  FF FE
 F00:0199       
 F00:0200       pt_module
-F00:0201       	incbin	"modules/MOD.heatbeat's theme"
-               S02:0000006C:  68 65 61 74 62 65 61 74 27 73 20 74 68 65 6D 65
-               S02:0000007C:  00 00 00 00 63 6F 6D 6D 2D 70 6F 73 65 64 20 62
+F00:0201       	incbin	"modules/MOD.BALANCE"
+               S02:0000006C:  34 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+               S02:0000007C:  00 00 00 00 53 75 62 6A 65 63 74 2F 42 61 6C 61
 F00:0202       
 F00:0203       bitmaps
 F00:0204       	ds.b	(320*256*3)/8
@@ -6117,7 +6117,7 @@ sinus LAB (0x1270) REF sec=maincode
 sinecounter1 LAB (0x126e) REF sec=maincode 
 pt_Music LAB (0x234) REF sec=maincode 
  main .mainloop LAB (0x15a) sec=maincode 
-bitmaps LAB (0x286c) REF sec=chipdata 
+bitmaps LAB (0x317e) REF sec=chipdata 
 myCopper LAB (0x0) REF sec=chipdata 
 myVBI LAB (0x160) REF sec=maincode 
 pt_Init LAB (0x1ae) REF sec=maincode 

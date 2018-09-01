@@ -198,7 +198,7 @@ myCopper
 	dc.w	$ffff,$fffe
 
 pt_module
-	incbin	"modules/MOD.heatbeat's theme"
+	incbin	"modules/MOD.BALANCE"
 
 bitmaps
 	ds.b	(320*256*3)/8
