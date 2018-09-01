@@ -12,7 +12,7 @@ function preload() {
 function setup() {
   //createCanvas(windowWidth, windowHeight);
   createCanvas(800,600);
-  background(204);
+  background(0);
   x = width/2;
   y = height/2;
   mySound.setVolume(1.0);
@@ -20,7 +20,7 @@ function setup() {
 }
 
 function draw() {
-  background(204);
+  background(0);
 
   var numPoints = int(map(mouseX, 0, width, 6, 60));
   var angle = 0;
