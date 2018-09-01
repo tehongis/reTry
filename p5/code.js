@@ -51,11 +51,11 @@ function draw() {
   image(colors, x, y_location);
 
   counter1 += 0.02;
-  if counter1 > PI*2 {
+  if ( counter1 > PI*2 ) {
       counter1 -= PI*2;
   }
   counter2 += 0.04;
-  if counter2 > PI*2 {
+  if ( counter2 > PI*2 ) {
       counter2 -= PI*2;
   }
 
