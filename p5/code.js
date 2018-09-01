@@ -4,7 +4,8 @@ var outsideRadius = 150;
 var insideRadius = 100;
 
 function setup() {
-  createCanvas(720, 400);
+  //createCanvas(windowWidth, windowHeight);
+  createCanvas(800,600);
   background(204);
   x = width/2;
   y = height/2;
