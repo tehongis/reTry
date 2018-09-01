@@ -3,12 +3,19 @@ var y;
 var outsideRadius = 150;
 var insideRadius = 100;
 
+function preload() {
+  soundFormats("mp3");
+  mySound = loadSound("assets/MRT - Phat Frog.mp3");
+}
+
 function setup() {
   //createCanvas(windowWidth, windowHeight);
   createCanvas(800,600);
   background(204);
   x = width/2;
   y = height/2;
+  mySound.setVolume(1.0);
+  mySound.play();
 }
 
 function draw() {
