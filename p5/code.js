@@ -2,7 +2,8 @@ var x;
 var y;
 var outsideRadius = 150;
 var insideRadius = 100;
-var counter = 0.0;
+var counter1 = 0.0;
+var counter2 = 0.0;
 
 function preload() {
   soundFormats("mp3");
