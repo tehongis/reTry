@@ -19,17 +19,15 @@ function setup() {
 
 function draw() {
   background(0);
-  ambientLight(50);
-  pointLight(250, 250, 250, 0, 400, -50);
+//  ambientLight(50);
+//  pointLight(250, 250, 250, 0, 400, -50);
 //  plane(500, 500);
 //  rotate(90,0,0);
     texture(cloud);
-
-
     rotateZ(theta);
 
-    for (i=0;i>10;i++) {
-        rotate(10*i,0,0);
+    for (i=0;i<10;i++) {
+        rotate(0,0,10*i);
         translate(50*i,0,0);
         plane(200, 200);
     }
