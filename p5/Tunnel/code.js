@@ -22,15 +22,15 @@ function draw() {
 
 //  translate(440,0,0);
 //  push();
-    rotateZ(theta * 0.1);
-    rotateX(theta * 0.1);
-    rotateY(theta * 0.1);
+    rotateZ(theta);
+    //rotateX(theta);
+    //rotateY(theta);
     texture(cloud);
     box(200, 200, 200);
 //  pop();
 
   theta += 0.02;
-  if ( theta > PI*2 ) {
-      theta -= PI*2;
+  if ( theta > TWO_PI ) {
+      theta -= TWO_PI;
   }
 }
