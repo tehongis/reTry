@@ -29,7 +29,13 @@ function draw() {
     rotateX(theta);
     rotateY(theta);
     texture(cloud);
-    plane(200, 200, 200);
+    plane(200, 200);
+    rotate(33,0,0)
+    plane(200, 200);
+    rotate(33,0,0)
+    plane(200, 200);
+    rotate(33,0,0)
+    plane(200, 200);
 //  pop();
 
   theta += 0.02;
