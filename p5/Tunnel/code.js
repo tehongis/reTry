@@ -30,12 +30,12 @@ function draw() {
 
     texture(cloud);
 
-    box(100,100,100);
     translate(-150,0,0)
     box(100,100,100);
     translate(-150,0,0)
     box(100,100,100);
     translate(300,0,0)
+    box(100,100,100);
 
   theta += 0.02;
   if ( theta > TWO_PI ) {
