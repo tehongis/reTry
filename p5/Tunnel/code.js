@@ -22,7 +22,7 @@ function draw() {
 
 //  translate(440,0,0);
 //  push();
-    rotateZ(theta);
+    rotateY(theta);
     //rotateX(theta);
     //rotateY(theta);
     texture(cloud);
