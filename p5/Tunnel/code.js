@@ -19,9 +19,10 @@ function setup() {
 
 function draw() {
   background(0);
-  ambientLight(150);
-  pointLight(250, 250, 250, 400, 400, -50);
-//  translate(440,0,0);
+  ambientLight(50);
+  pointLight(250, 250, 250, 0, 400, -50);
+  plane(50, 50);
+  translate(440,0,0);
 //  push();
     rotateZ(theta);
     rotateX(theta);
