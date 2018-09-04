@@ -24,6 +24,7 @@ function draw() {
 //  pointLight(250, 250, 250, 0, 400, -50);
 //  plane(500, 500);
 //  rotate(90,0,0);
+    rotateZ(theta);
 
     for (i = 0 ; i < 30 ; i++) {
         texture(cloud);
@@ -31,7 +32,6 @@ function draw() {
         translate(0,0,i*50);
         rotate(10*i,0,10*i);
     }
-  rotateZ(theta);
 
   theta += 0.02;
   if ( theta > TWO_PI ) {
