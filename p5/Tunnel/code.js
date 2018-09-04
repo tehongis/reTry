@@ -23,22 +23,28 @@ function draw() {
   pointLight(250, 250, 250, 0, 400, -50);
 //  plane(500, 500);
 //  rotate(90,0,0);
-//  push();
+    texture(cloud);
     rotateZ(theta);
     rotateX(theta);
     rotateY(theta);
-    texture(cloud);
+
+    push();
     plane(200, 200);
     rotate(33,0,33)
     translate(0,20,0);
+    pop();
+
+    push();
     plane(200, 200);
-    rotate(33,0,33)
+    rotate(63,0,33)
     translate(0,20,0);
+    pop();
+
+    push();
     plane(200, 200);
-    rotate(33,0,33)
+    rotate(93,0,33)
     translate(0,20,0);
-    plane(200, 200);
-//  pop();
+    pop();
 
   theta += 0.02;
   if ( theta > TWO_PI ) {
