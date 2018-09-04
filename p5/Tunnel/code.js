@@ -25,21 +25,25 @@ function draw() {
 //  rotate(90,0,0);
     texture(cloud);
 
+    rotateZ(theta);
+    rotateX(theta);
+    rotateY(theta);
+    translate(30,20,100);
     plane(200, 200);
-    rotate(33,30,33)
-    translate(30,20,0);
-
-    plane(200, 200);
-    rotate(63,60,33)
-    translate(30,20,0);
-
-    plane(200, 200);
-    rotate(93,90,33)
-    translate(30,20,0);
 
     rotateZ(theta);
     rotateX(theta);
     rotateY(theta);
+    translate(30,20,200);
+    plane(200, 200);
+
+    rotateZ(theta);
+    rotateX(theta);
+    rotateY(theta);
+    translate(30,20,300);
+    plane(200, 200);
+
+
 
   theta += 0.02;
   if ( theta > TWO_PI ) {
