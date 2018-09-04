@@ -29,12 +29,12 @@ function draw() {
     rotateZ(theta);
 
     for (i = 0 ; i < 30 ; i++) {
-        push();
+        pop();
         texture(cloud);
-        box(100, 100,100);
         translate(0,0,i*50);
         rotate(10*i,0,10*i);
-        pop();
+        box(100, 100,100);
+        push();
     }
 
   theta += 0.02;
