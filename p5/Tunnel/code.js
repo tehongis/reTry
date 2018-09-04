@@ -31,9 +31,12 @@ function draw() {
     texture(cloud);
 
     translate(-150,0,0)
+    rotate(0,0,10)
     box(100,100,100);
+    rotate(0,0,10)
     translate(-150,0,0)
     box(100,100,100);
+    rotate(0,0,10)
     translate(300,0,0)
     box(100,100,100);
 
