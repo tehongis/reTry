@@ -25,23 +25,14 @@ function draw() {
 //  rotate(90,0,0);
     texture(cloud);
 
-    rotateZ(theta);
-    rotateX(theta);
-    rotateY(theta);
-    translate(30,20,100);
-    plane(200, 200);
 
     rotateZ(theta);
-    rotateX(theta);
-    rotateY(theta);
-    translate(30,20,200);
-    plane(200, 200);
 
-    rotateZ(theta);
-    rotateX(theta);
-    rotateY(theta);
-    translate(30,20,300);
-    plane(200, 200);
+    for (i=0;i>10;i++) {
+        rotate(10*i,0,0);
+        translate(50*i,0,0);
+        plane(200, 200);
+    }
 
 
 
