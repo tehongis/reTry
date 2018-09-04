@@ -31,9 +31,9 @@ function draw() {
     for (i = 0 ; i < 30 ; i++) {
         push();
         texture(cloud);
-        translate(0,0,i*50);
-        rotate(10*i,0,10*i);
         box(100, 100,100);
+        translate(i*50,0,0);
+        rotate(10*i,0,10*i);
         pop();
     }
 
