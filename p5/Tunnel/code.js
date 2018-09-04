@@ -21,7 +21,7 @@ function draw() {
   background(0);
   ambientLight(50);
   pointLight(250, 250, 250, 0, 400, -50);
-  plane(500, 500);
+//  plane(500, 500);
 //  rotate(90,0,0);
 //  translate(0,200,0);
 //  push();
@@ -29,7 +29,7 @@ function draw() {
     rotateX(theta);
     rotateY(theta);
     texture(cloud);
-    box(200, 200, 200);
+    plane(200, 200, 200);
 //  pop();
 
   theta += 0.02;
