@@ -28,10 +28,11 @@ function draw() {
     rotateY(theta);
     rotateZ(theta);
 
+    texture(cloud);
     box(100, 100,100);
-    translate(-50,0,0)
+    translate(-150,0,0)
     box(100, 100,100);
-    translate(50,0,0)
+    translate(150,0,0)
     box(100, 100,100);
 
   theta += 0.02;
