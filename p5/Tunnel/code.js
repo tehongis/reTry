@@ -19,7 +19,8 @@ function setup() {
 
 function draw() {
   background(0);
-  pointLight(250, 250, 250, 200, 200, 50);
+  ambientLight(150);
+  pointLight(250, 250, 250, 400, 400, -50);
 //  translate(440,0,0);
 //  push();
     rotateZ(theta);
