@@ -26,12 +26,12 @@ function draw() {
 //  rotate(90,0,0);
 
     for (i = 0 ; i < 30 ; i++) {
+        texture(cloud);
         translate(0,0,i*50);
         rotate(10*i,0,10*i);
-        texture(cloud);
-        rotateZ(theta);
         plane(200, 200);
     }
+  rotateZ(theta);
 
   theta += 0.02;
   if ( theta > TWO_PI ) {
