@@ -23,18 +23,20 @@ function draw() {
   pointLight(250, 250, 250, 0, 400, -50);
 //  plane(500, 500);
 //  rotate(90,0,0);
-//  translate(0,200,0);
 //  push();
     rotateZ(theta);
     rotateX(theta);
     rotateY(theta);
     texture(cloud);
     plane(200, 200);
-    rotate(33,0,0)
+    rotate(33,0,33)
+    translate(0,20,0);
     plane(200, 200);
-    rotate(33,0,0)
+    rotate(33,0,33)
+    translate(0,20,0);
     plane(200, 200);
-    rotate(33,0,0)
+    rotate(33,0,33)
+    translate(0,20,0);
     plane(200, 200);
 //  pop();
 
