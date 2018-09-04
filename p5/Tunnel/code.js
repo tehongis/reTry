@@ -2,6 +2,7 @@
 
 var cloud;
 var theta = 0;
+var i;
 
 function preload() {
 //  soundFormats("mp3");
@@ -26,7 +27,7 @@ function draw() {
     texture(cloud);
     rotateZ(theta);
 
-    for (i=0;i<10;i++) {
+    for (i = 0 ; i < 10 ; i++) {
         rotate(0,0,10*i);
         translate(50*i,0,0);
         plane(200, 200);
