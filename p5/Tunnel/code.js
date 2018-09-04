@@ -28,8 +28,8 @@ function draw() {
     rotateZ(theta);
 
     for (i = 0 ; i < 10 ; i++) {
-        rotate(0,0,10*i);
-        translate(50*i,0,0);
+        rotate(10*i,0,10*i);
+        translate(0,0,i*50);
         plane(200, 200);
     }
 
