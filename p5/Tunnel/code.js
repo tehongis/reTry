@@ -24,6 +24,8 @@ function draw() {
 //  pointLight(250, 250, 250, 0, 400, -50);
 //  plane(500, 500);
 //  rotate(90,0,0);
+    rotateX(theta);
+    rotateY(theta);
     rotateZ(theta);
 
     for (i = 0 ; i < 30 ; i++) {
