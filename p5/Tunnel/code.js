@@ -27,9 +27,9 @@ function draw() {
 
     for (i = 0 ; i < 30 ; i++) {
         texture(cloud);
+        box(100, 100,100);
         translate(0,0,i*50);
         rotate(10*i,0,10*i);
-        plane(200, 200);
     }
   rotateZ(theta);
 
