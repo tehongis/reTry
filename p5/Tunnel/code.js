@@ -28,12 +28,11 @@ function draw() {
     rotateY(theta);
     rotateZ(theta);
 
-    for (i = 0 ; i < 30 ; i++) {
-        texture(cloud);
-        rotate(10*i,0,10*i);
-        box(100, 100,100);
-        translate(i*50,0,0);
-    }
+    box(100, 100,100);
+    translate(-50,0,0)
+    box(100, 100,100);
+    translate(50,0,0)
+    box(100, 100,100);
 
   theta += 0.02;
   if ( theta > TWO_PI ) {
