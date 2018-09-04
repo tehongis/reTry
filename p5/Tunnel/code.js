@@ -22,7 +22,7 @@ function draw() {
   ambientLight(50);
   pointLight(250, 250, 250, 0, 400, -50);
   plane(500, 500);
-  rotate(0,0,90);
+  rotate(90,0,0);
   translate(0,200,0);
 //  push();
     rotateZ(theta);
