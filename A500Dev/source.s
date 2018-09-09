@@ -184,6 +184,12 @@ myCopper
 
 	dc.w	COLOR0,$0000
 	dc.w	COLOR1,$0fff
+	dc.w	COLOR2,$0f00
+	dc.w	COLOR3,$00f0
+	dc.w	COLOR4,$000f
+	dc.w	COLOR5,$0ff0
+	dc.w	COLOR6,$00ff
+	dc.w	COLOR7,$0f0f
 
 	dc.w	$1f11,$fffe
 	dc.w	COLOR0,$0fff
@@ -198,9 +204,9 @@ myCopper
 	dc.w	$ffff,$fffe
 
 pt_module
-	incbin	"modules/MOD.heatbeat's theme"
+	incbin	"modules/heatbeat-spacelove.mod"
 
 bitmaps
-	ds.b	(320*256*3)/8
+	ds.b	(320*256*3)/8,$cafe
 
 	end

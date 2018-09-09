@@ -5,13 +5,13 @@ ifeq ($(OS),Windows_NT)
 	#OPTS=  -Fhunkexe -kick1hunks -devpac -nosym
 	OPTS=  -Fhunkexe -devpac -nosym -L listfile.txt
 	#OUTFILE = "C:\Users\Public\Documents\Amiga Files\WinUAE\Harddrives\DevHDD\demo.exe"
-	OUTFILE = "HDD\c\demo.exe"
+	OUTFILE = "HDD\demo.exe"
 
 else
 	OSFLAG += -D LINUX
 	VASM=vasmm68k_mot
 	OPTS=  -Fhunkexe -devpac -nosym -L listfile.txt
-	OUTFILE = "DevHDD\demo.exe"
+	OUTFILE = "HDD/demo.exe"
 endif
 
 demo.exe	:	source.s
