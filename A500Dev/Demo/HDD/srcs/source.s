@@ -204,11 +204,7 @@ myCopper
 	dc.w	$ffff,$fffe
 
 pt_module
-<<<<<<< HEAD:A500Dev/source.s
-	incbin	"modules/heatbeat-spacelove.mod"
-=======
-	incbin	"modules/MOD.BALANCE"
->>>>>>> fab1f44c0dc5d9241ef835ff7c59ab0065eb81bf:A500Dev/Demo/source.s
+	incbin	"HDD/modules/mod.heatbeat-spacelove"
 
 bitmaps
 	ds.b	(320*256*3)/8,$cafe
