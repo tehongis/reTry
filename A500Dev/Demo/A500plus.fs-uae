@@ -1,0 +1,12 @@
+# FS-UAE configuration saved by FS-UAE Launcher
+# Last saved: 2018-06-18 08:27:30
+
+[fs-uae]
+amiga_model = A500+
+chip_memory = 1024
+fast_memory = 4096
+hard_drive_0 = /home/thongisto/reTry/A500Dev/HDD
+kickstart_file = Kickstart v2.04 rev 37.175 (1991)(Commodore)(A500+).rom
+slow_memory = 1024
+console_debugger=1
+window_border=1

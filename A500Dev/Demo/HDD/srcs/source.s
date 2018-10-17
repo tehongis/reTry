@@ -204,7 +204,7 @@ myCopper
 	dc.w	$ffff,$fffe
 
 pt_module
-	incbin	"HDD/modules/mod.heatbeat-spacelove"
+	incbin	"HDD/modules/mod.12th_echo"
 
 bitmaps
 	ds.b	(320*256*3)/8,$cafe
