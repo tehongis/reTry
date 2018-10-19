@@ -1,3 +1,0 @@
-
-fatal error 13: could not open <song.dat> for input
-aborting...
