@@ -339,4 +339,4 @@ rastercolors
 	org $3800
 screen
 	;reTry
-	incbin	"retry.scr"
+	incbin	"reTry.scr"
