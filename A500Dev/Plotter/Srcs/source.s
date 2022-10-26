@@ -163,7 +163,10 @@ gfxName
 	dc.b	"graphics.library",0
 	even
 
-		section chipdata,data_C
+;------ Chipdata below
+
+	section chipdata,data_C
+
 myCopper
 	dc.w	$0011,$fffe
 	dc.w	DIWSTRT,$2c81
@@ -191,10 +194,11 @@ myCopper
 	dc.w	COLOR6,$00ff
 	dc.w	COLOR7,$0f0f
 
-	dc.w	$1f11,$fffe
+	dc.w	$2b11,$fffe
 	dc.w	COLOR0,$0fff
-	dc.w	$2011,$fffe
+	dc.w	$2c11,$fffe
 	dc.w	COLOR0,$0000
+
 	dc.w	$ffdf,$fffe		;Over the VPOS max...
 	dc.w	$2111,$fffe
 	dc.w	COLOR0,$0fff
@@ -202,11 +206,12 @@ myCopper
 	dc.w	COLOR0,$0000
 
 	dc.w	$ffff,$fffe
+	dc.w	$ffff,$fffe
 
 pt_module
-	incbin	"mod.12th_echo"
+	incbin	"mods/mod.heatbeat-spacelove"
 
 bitmaps
-	ds.b	(320*256*3)/8,$cafe
+	dcb.w	(320*256*3)/16,$dead
 
 	end
