@@ -1,8 +1,7 @@
 run		:	random.exe
-		fs-uae	
+		fs-uae A500plus.fs-uae
+
 random.exe	:	random.asm
-		vasmm68k_mot -Fhunkexe -o random.exe random.asm 
-		mv random.exe "/home/thongisto/Asiakirjat/FS-UAE/Hard Drives/DevHDD/main.exe" 
+		vasmm68k_mot -Fhunkexe -o ./HDD/random.exe random.asm 
 clean		: 
-		rm "/home/thongisto/Asiakirjat/FS-UAE/Hard Drives/DevHDD/main.exe"
-		rm random.exe
+		rm "./HDD/random.exe"
