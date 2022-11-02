@@ -2,6 +2,61 @@
 ; CodeVacation 2018
 ; "I never wanted to exit to the OS anyway..."
 
+
+
+
+;Address	Name	Description
+;DFF08E	DIWSTRT	Display window start (upper left vertical-horizontal position)
+;DFF090	DIWSTOP	Display window stop (lower right vertical-horizontal position)
+
+;These registers control the display window size and position,
+;by locating the upper left and lower right corners.
+
+;Bit	15	14	13	12	11	10	09	08	07	06	05	04	03	02	01	00
+; 	V7	V6	V5	V4	V3	V2	V1	V0	H9	H8	H7	H6	H5	H4	H3	H2
+
+;DIWSTRT is vertically restricted to the upper 2/3 of the display (V8=0),
+;and horizontally restricted to the left 3/4 of the display (H8=0).
+
+;See DIWHIGH for exceptions.
+
+
+;Address	Name	Description
+;DFF092	DDFSTRT	Display data fetch start (horizontal position)
+;DFF094	DDFSTOP	Display data fetch stop (horizontal position)
+
+;These registers control the horizontal timing of the beginning and
+;end of the bit plane DMA timing display data fetch. The vertical bit
+;plane DMA timing is identical to the display windows described above.
+;The bit plane Modulos are dependent on the bit plane horizontal size,
+;and on this data fetch window size.
+
+;Register bit assignment :
+
+;Bit	15	14	13	12	11	10	09	08	07	06	05	04	03	02	01	00
+; 	0	0	0	0	0	0	0	0	H8	H7	H6	H5	H4	H3	H2	0
+
+;The tables below show the start and stop timing for different register contents
+
+;DDFSTRT (Left edge of display data fetch) :
+
+;PURPOSE	H8	H7	H6	H5	H4
+;Extra wide (max)	0	0	1	0	1
+;wide	0	0	1	1	0
+;normal	0	0	1	1	1
+;narrow	0	1	0	0	0
+
+;DDFSTOP (Right edge of display data fetch) :
+
+;PURPOSE	H8	H7	H6	H5	H4
+;narrow	1	1	0	0	1
+;normal	1	1	0	1	0
+;wide (max)	1	1	0	1	1
+
+;Note that these numbers will vary with variable beam counter mode
+;set: (The maxes and mins, that is).
+
+
 	include LVOs.i
 	include Hards.i
 
@@ -76,6 +131,7 @@ main
 	move.w	#0,COPJMP1(a6)
 
 	lea		bitmaps,a1
+	add.l 	#$100,a1
 	move.l	a1,d0
 	add.l	#38,a0		;bitmap pointers begin
 
@@ -170,7 +226,7 @@ gfxName
 myCopper
 	dc.w	$0011,$fffe
 	dc.w	DIWSTRT,$2c81
-	dc.w	DIWSTOP,$c8d1
+	dc.w	DIWSTOP,$2bd1
 	dc.w	DDFSTRT,$0038
 	dc.w	DDFSTOP,$00d0
 	dc.w	BPLCON0,$3200
@@ -200,9 +256,9 @@ myCopper
 	dc.w	COLOR0,$0000
 
 	dc.w	$ffdf,$fffe		;Over the VPOS max...
-	dc.w	$2111,$fffe
+	dc.w	$2b11,$fffe
 	dc.w	COLOR0,$0fff
-	dc.w	$2211,$fffe
+	dc.w	$2c11,$fffe
 	dc.w	COLOR0,$0000
 
 	dc.w	$ffff,$fffe
@@ -212,6 +268,6 @@ pt_module
 	incbin	"mods/mod.heatbeat-spacelove"
 
 bitmaps
-	dcb.w	(320*256*3)/16,$dead
+	dcb.w	(320*256*3)/16+$100,$dead
 
 	end
