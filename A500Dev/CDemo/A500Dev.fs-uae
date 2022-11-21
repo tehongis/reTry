@@ -1,4 +1,4 @@
-fullscreen = 1
+fullscreen = 0
 use_gui=no
 kickstart_file=Kickstart v1.3 rev 34.5 (1987)(Commodore)(A500-A1000-A2000-CDTV).rom
 chipmem_ram = 512
