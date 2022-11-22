@@ -1,6 +1,13 @@
+
 #include <proto/exec.h>
+#include <exec/types.h>
+
+#include <proto/intuition.h>
+//#include <inline/intuition_protos.h>
+
 #include <proto/graphics.h>
 #include <graphics/gfxbase.h>
+
 
 #include <hardware/custom.h>
 #include <hardware/cia.h>
@@ -8,7 +15,6 @@
 #include <hardware/adkbits.h>
 #include <hardware/dmabits.h>
 #include <hardware/intbits.h>
-
 
 #define DIWSTRT_VALUE      0x2c81
 #define DIWSTOP_VALUE_PAL  0x2cc1
@@ -23,16 +29,12 @@
 #define DISPLAY_HEIGHT   (256)
 #define DISPLAY_ROW_BYTES (DISPLAY_WIDTH / 8)
 
+
+extern struct CIA ciaa, ciab;
 #define PRA_FIR0_BIT            (1 << 6)
 
-
-#define CIAAPRA 0xBFE001
-#define LEFT_BUTTON   1
-
-struct GfxBase *GfxBase;
 extern struct Custom custom;
-extern struct CIA ciaa, ciab;
-struct CIA *cia = (struct CIA *) CIAAPRA;
+struct GfxBase *GfxBase;
 
 static void wait_vblank()
 {
@@ -61,13 +63,14 @@ int main()
   Disable();
 
   int i = 0;
-
-  while( ( cia->ciapra & 0x0040 ) ? LEFT_BUTTON : 0 )
-  {
+  while( ( ciaa.ciapra & PRA_FIR0_BIT ) ? 1 : 0 )  {
+    WaitTOF();
+  
     custom.color[0] = (UBYTE) i;
     custom.color[1] = (UBYTE) 0xfff;
     i = i + 1;
     i = i & 0xfff;
+  
   }
 
 
