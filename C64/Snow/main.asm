@@ -1,5 +1,7 @@
 
 mode        equ $f8
+ptrlo       equ $fa
+ptrhi       equ $fb
 counter     equ $ff
 
     org $0801
@@ -68,13 +70,10 @@ copyfont
     sta $3a00,x
     lda $d300,x
     sta $3b00,x
-    lda $d400,x
+    lda #$ff
     sta $3c00,x
-    lda $d500,x
     sta $3d00,x
-    lda $d600,x
     sta $3e00,x
-    lda $d700,x
     sta $3f00,x
     inx
     bne .fontloop
@@ -89,55 +88,29 @@ irq
     jsr music+3
 
     lda mode
-;    sta $d020   ; For debug only ..remove later
     cmp #$00
     bne .step1
     pha
+    lda #$01
+    sta $d020
+    lda #$06
+    sta $d021
+
     jsr scrollup
     pla
 .step1
 
-    lda mode
-;    sta $d020   ; For debug only ..remove later
     cmp #$01
-    bne .step2
-    pha
-    jsr fontclearer
-    pla
-.step2
-
-    cmp #$02
-    bne .step3
-    pha
-    lda #$0e
-    sta $d020
-    lda #$0e
-    sta $d021
-    jsr screenfiller
-    pla
-.step3
-
-    cmp #$03
-    bne .step4
-    pha
-    lda #$0e
-    sta $d020
-    lda #$0e
-    sta $d021
-    jsr colorset
-    pla
-.step4
-
-    cmp #$04
     bne .step5
     pha
-    lda #$0e
+    lda #$01
     sta $d020
-    lda #$0e
+    lda #$00
     sta $d021
     jsr drop
     pla
 .step5
+
 
     lda $d019
     sta $d019
@@ -146,117 +119,49 @@ irq
 ;-------------- end of IRQ
 
 scrollup
-    ldy counter
-    lda screenhi,y
-    sta $fb
-    lda screenlo,y
-    sta $fa
-
-    ldy #0
-.lineloop
-    lda #$a0
-    sta ($fa),y
-    iny
-    cpy #$28
-    bne .lineloop
-
-    lda counter
-    cmp #24
-    bcc .notdone
-    lda #$00
-    sta counter
-    lda #$01
-    sta mode
-    rts
-.notdone
-    inc counter
-    rts
-
-fontclearer
     ldx counter
-    lda #$ff
-    sta $3800,x
-    sta $3900,x
-    sta $3a00,x
-    sta $3b00,x
-    sta $3c00,x
-    sta $3d00,x
-    sta $3e00,x
-    sta $3f00,x
+    
+.scrolloop
+    lda screenhi,x
+    sta ptrhi
+    lda screenlo,x
+    sta ptrlo
 
-    txa
-    cmp #counter
-    bcc .notdone
-    lda #$00
-    sta counter
-    lda #$02
-    sta mode
-    rts
+    clc
+    lda counter
+    adc #$80
 
-.notdone
-    inc counter
-
-    rts
-
-screenfiller
-    ldy counter
-    lda screenhi,y
-    sta $fb
-    lda screenlo,y
-    sta $fa
-    tya
     ldy #$00
-.lineloop
-    sta ($fa),y
+.loop
+    sta (ptrlo),y
     iny
     cpy #$28
-    bne .lineloop
+    bne .loop
+
+    clc
+    lda ptrhi
+    adc #$d4
+    sta ptrhi
+
+    lda #$01
+    ldy #$00
+.loop2
+    sta (ptrlo),y
+    iny
+    cpy #$28
+    bne .loop2
+
 
     lda counter
     cmp #24
     bcc .notdone
+
     lda #$00
     sta counter
-    lda #$03
-    sta mode
-    rts
-
-.notdone
-    inc counter
-
-    rts
-
-colorset
-    lda #$d8
-    sta $fb
-    lda #$00
-    sta $fa
-
-    ldy counter
-
-    ldx #$00
-.loop
     lda #$01
-    sta ($fa),y
-    clc
-    lda $fa
-    adc #$28
-    sta $fa
-    lda $fb
-    adc #$00
-    sta $fb
-    inx
-    cpx #24
-    bne .loop
-  
-    lda counter
-    cmp #$27
-    bcc .notdone
-    lda #$00
-    sta counter
-    lda #$04
     sta mode
     rts
+
 .notdone
     inc counter
 
@@ -264,12 +169,12 @@ colorset
 
 drop
     ldx counter
-    stx $38c8
+    stx $3cc8
     ldx #$00
     clc
 .loop  
-    lda $3801,x
-    sta $3800,x
+    lda $3c01,x
+    sta $3c00,x
     inx
     cpx #$c8
     bne .loop
