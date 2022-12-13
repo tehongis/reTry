@@ -1,5 +1,6 @@
 ; Testing pseudorandom
-; 
+; http://www.pjhutchison.org/emulation/AmigaAsmTutorial.txt
+
 
 ExecBase	equ $4
 
@@ -22,6 +23,7 @@ main
 	move.l	d0,d2
 	jsr	print
 
+	moveq.l	#0,d0
 	rts
 
 rand
@@ -33,9 +35,9 @@ rand
 
 print
 	move.l	output_handle,d1
-        lea     buffer,a0
-        move.l  a0,d2
-	move.l	#$16,d3
+	lea     buffer,a0
+	move.l  a0,d2
+	move.l	#10,d3
 	move.l	dosbase,a6
 	jsr	_LVOWrite(a6)
 	rts
@@ -58,7 +60,7 @@ output_handle
 randseed
 	dc.l	$a1b2c3d4
 buffer
-	dc.b	"00000000",0
+	dc.b	"00000000",10,13,0
 
 dosname	dc.b 	"dos.library",0
 

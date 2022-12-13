@@ -1,0 +1,17 @@
+fullscreen = 0
+use_gui=no
+kickstart_file=Kickstart v1.3 rev 34.5 (1987)(Commodore)(A500-A1000-A2000-CDTV).rom
+chipmem_ram = 512
+chipset=ocs
+chipset_compatible=A500
+rtc=MSM6242B
+slow_memory = 512
+fast_memory = 0
+cpu_type=68000
+cpu_model=68000
+uae_cpu_model=68000
+log_illegal_mem=false
+kbd_lang=se
+floppy-drive-0=
+floppy_speed=100
+hard_drive_0=./HDD/

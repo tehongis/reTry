@@ -170,7 +170,7 @@ irq_d
 
     org $1000
 music
-    incbin  "avenge.dat",2
+    incbin  "Avenge.dat",2
 
 ;Name:            Avenge
 ;Author:          Thomas Mogensen (DRAX)

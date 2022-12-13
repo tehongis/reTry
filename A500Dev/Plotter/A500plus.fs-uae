@@ -1,0 +1,13 @@
+# FS-UAE configuration saved by FS-UAE Launcher
+# Last saved: 2018-06-18 08:27:30
+
+[fs-uae]
+amiga_model = A500
+chip_memory = 512
+fast_memory = 0
+hard_drive_0 = ./HDD
+#floppy_drive_0 = Workbench v1.2 rev 33.56 (1987)(Commodore)(A500)(Disk 1 of 2)(Workbench).adf
+kickstart_file = Kickstart v1.2 rev 33.180 (1986)(Commodore)(A500-A1000-A2000).rom 
+slow_memory = 512
+console_debugger=1
+window_border=1
