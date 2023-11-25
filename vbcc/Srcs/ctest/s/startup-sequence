@@ -1,0 +1,11 @@
+c:SetPatch
+
+BindDrivers
+
+SetClock load
+
+SYS:System/SetMap usa1
+
+path ram: c: sys:utilities sys:system s: sys:prefs add ;set path for Workbench
+
+DH0:a.out
