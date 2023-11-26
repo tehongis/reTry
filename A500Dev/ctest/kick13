@@ -1,13 +1,13 @@
--cc=vbccm68k -quiet %s -o= %s %s -O=%ld -no-cpp-warn -I"C:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\include" -I"C:\vbcc\NDK\Include_H" 
--ccv=vbccm68k %s -o= %s %s -O=%ld -no-cpp-warn -I"C:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\include" -I"C:\vbcc\NDK\Include_H"
+-cc=vbccm68k -quiet %s -o= %s %s -O=%ld -no-cpp-warn -I"E:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\include" -I"E:\NDK3.2\Include_H" 
+-ccv=vbccm68k %s -o= %s %s -O=%ld -no-cpp-warn -I"E:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\include" -I"E:\NDK3.2\Include_H"
 -as=vasmm68k_mot -quiet -Fhunk -kick1hunks -nowarn=62 %s -o %s
 -asv=vasmm68k_mot -Fhunk -kick1hunks -nowarn=62 %s -o %s
 -rm=del /Q %s
 -rmv=del %s
--ld=vlink -bamigahunk -x -Bstatic -Cvbcc -nostdlib -Z -mrel "C:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib\startup.o" %s %s -L"C:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib" -lvc -o %s
--l2=vlink -bamigahunk -x -Bstatic -Cvbcc -nostdlib -Z -mrel %s %s -L"C:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib" -o %s
--ldv=vlink -bamigahunk -t -x -Bstatic -Cvbcc -nostdlib -Z -mrel "C:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib\startup.o" %s %s -L"C:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib" -lvc -o %s
--l2v=vlink -bamigahunk -t -x -Bstatic -Cvbcc -nostdlib -Z -mrel %s %s -L"C:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib" -o %s
+-ld=vlink -bamigahunk -x -Bstatic -Cvbcc -nostdlib -Z -mrel "E:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib\startup.o" %s %s -L"E:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib" -lvc -o %s
+-l2=vlink -bamigahunk -x -Bstatic -Cvbcc -nostdlib -Z -mrel %s %s -L"E:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib" -o %s
+-ldv=vlink -bamigahunk -t -x -Bstatic -Cvbcc -nostdlib -Z -mrel "E:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib\startup.o" %s %s -L"E:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib" -lvc -o %s
+-l2v=vlink -bamigahunk -t -x -Bstatic -Cvbcc -nostdlib -Z -mrel %s %s -L"E:\vbcc\targets\vbcc_target_m68k-kick13\targets\m68k-kick13\lib" -o %s
 -ldnodb=-s
 -ul=-l%s
 -cf=-F%s
