@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <proto/exec.h>
 #include <proto/dos.h>
@@ -40,11 +41,16 @@
 
 //extern struct Custom custom;
 struct Custom custom;
+
+#define CIAAPRA 0xBFE001
+struct CIA *cia = (struct CIA *) CIAAPRA;
+#define LEFT_BUTTON   1
+
 struct GfxBase *GfxBase;
 struct View *oldView;
 
-static UWORD __chip coplist[] = {
-    COP_WAIT(0x0000,0xfffe),
+static UWORD __chip copperlist[] = {
+    COP_WAIT(0x0000, 0xfffe),
     COP_MOVE(BPLCON0, 0x2200),
     COP_MOVE(DDFSTRT, 0x0038),
     COP_MOVE(DDFSTOP, 0x00d0),
@@ -64,19 +70,34 @@ static UWORD __chip coplist[] = {
     COP_MOVE(COLOR05, 0x888),
     COP_MOVE(COLOR06, 0xaaa),
     COP_MOVE(COLOR07, 0xccc),
-
-
     COP_WAIT_END,
     COP_WAIT_END
 };
 
 
+static void wait_vblank() {
+    while ( custom.vhposr != (UBYTE)( 200 + 1 ) ) { };
+}
 
 
+BOOL check_mouse(void) {
+    BOOL button = ( cia->ciapra & 0x0040 ) ? LEFT_BUTTON : 0;
+    return button;
+}
 
-void waitmouse(void) {
-    volatile UBYTE *ciaa_pra = (volatile UBYTE *) 0xbfe001;
-    while ((*ciaa_pra & PRA_FIR0_BIT) != 0) ;
+static void init_display(void)
+{
+    LoadView(NULL);  // clear display, reset hardware registers
+    WaitTOF();       // 2 WaitTOFs to wait for 1. long frame and
+    WaitTOF();       // 2. short frame copper lists to finish (if interlaced)
+}
+
+static void reset_display(void)
+{
+    LoadView(((struct GfxBase *) GfxBase)->ActiView);
+    WaitTOF();
+    WaitTOF();
+    custom.cop1lc = (ULONG) ((struct GfxBase *) GfxBase)->copinit;
 }
 
 
@@ -84,14 +105,35 @@ int main() {
 
 	//SysBase = *((struct ExecBase**)4UL);
 
-    UWORD *imgdata = AllocMem( BPLANE_SIZE, CHIP_MEM_ATTR );
-    //UWORD __chip 
+    static UWORD __chip bitplane[BPLANE_SIZE];
+
+    //UWORD *bitplane = AllocMem( BPLANE_SIZE, CHIP_MEM_ATTR );
+    // | MEM_CLEAR
+    ULONG bplane_addr = (ULONG) &bitplane;
+//    printf("bitplane address: %08x\n", bplane_addr);
+    UWORD hi = ((ULONG) bplane_addr >> 16) & 0xffff;
+    UWORD lo = (ULONG) bplane_addr & 0xffff;
+    copperlist[13] = lo;
+    copperlist[16] = hi;
+//    printf("low: %04x\n", lo);
+//    printf("high: %04x\n", hi);
+
+    //exit(0);
+    
+/*
+    UWORD *copper_mem = AllocMem( sizeof(copperlist), CHIP_MEM_ATTR );
+    for (int i = 0; i < sizeof(copperlist);i++) {
+        copper_mem[i] = copperlist[i];
+    }
+*/    
+    //memcpy(copper_mem,copperlist,sizeof(copperlist));
 
     GfxBase = (struct GfxBase *) OpenLibrary("graphics.library", 0);
     if (GfxBase == NULL) exit(1);
     oldView = GfxBase->ActiView;
 
 
+    // Backup original values
     ULONG systemADKCON = custom.adkconr;
     ULONG systemINTENA = custom.intenar;
     ULONG systemDMACON = custom.dmaconr;
@@ -102,36 +144,43 @@ int main() {
     struct Task *current_task = FindTask(NULL);
     BYTE old_prio = SetTaskPri(current_task, TASK_PRIORITY);
 
-    LoadView(NULL);  // clear display, reset hardware registers
-    WaitTOF();       // 2 WaitTOFs to wait for 1. long frame and
-    WaitTOF();       // 2. short frame copper lists to finish (if interlaced)
-    BOOL palFlag = (((struct GfxBase *) GfxBase)->DisplayFlags & PAL) == PAL;
 
+//    init_display();
+
+/*
     OwnBlitter();
     WaitBlit();
-
-    Disable();
     Forbid();
+    Disable();
+*/
+
+    // Stop all dma
+    // custom.dmacon = DMAF_ALL;
+    // enable bitplane and copper,blitter and blithog
+    // custom.dmacon = DMAF_SETCLR|DMAF_BLITHOG|DMAF_BLITTER|DMAF_COPPER|DMAF_RASTER|DMAF_SPRITE;
 
     // no sprite DMA
-    custom.intena = 0x7FFF;
     custom.dmacon  = 0x0020;
 
-    custom.cop1lc = (ULONG) coplist;
+    custom.cop1lc = (ULONG) copperlist;
 
+    BOOL running = TRUE;
+    while(running) {
+        wait_vblank();
+        if (check_mouse()) {
+            running = FALSE;
+        };
+    }
 
-    waitmouse();
-
-
-    Permit();
+/*
     Enable();
+    Permit();
     DisownBlitter();
+*/
 
-    LoadView(oldView);
-    WaitTOF();
-    WaitTOF();
+    //reset_display();
 
-    FreeMem(imgdata,BPLANE_SIZE);
+    //FreeMem(bitplane,BPLANE_SIZE);
 
     return 0;
 }

@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "E:\\vbcc\\targets\\vbcc_target_m68k-kick13\\targets\\m68k-kick13\\include",
+                "E:\\NDK3.2\\Include_H"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "configurationProvider": "ms-vscode.makefile-tools",
+            "compilerPath": "E:\\vbcc\\bin\\vc.exe",
+            "cStandard": "c99"
+        }
+    ],
+    "version": 4
+}
