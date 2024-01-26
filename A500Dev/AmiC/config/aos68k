@@ -1,16 +1,17 @@
--cc=vbccm68k -quiet %s -o= %s %s -O=%ld -Iinclude_h -Itargets/m68k-amigaos/include
--ccv=vbccm68k %s -o= %s %s -O=%ld -Iinclude_h -Itargets/m68k-amigaos/include
+-cc=vbccm68k -quiet %s -o= %s %s -O=%ld -I/home/thongisto/Srcs/AmigaIncludes/ndk_3.1/includes\&libs/include_h/ -I/home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/
+-ccv=vbccm68k %s -o= %s %s -O=%ld -I/home/thongisto/Srcs/AmigaIncludes/ndk_3.1/includes\&libs/include_h/ -I/home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/
 -as=vasmm68k_mot -quiet -Fhunk -nowarn=62 %s -o %s
 -asv=vasmm68k_mot -Fhunk -nowarn=62 %s -o %s
 -rm=rm %s
 -rmv=rm %s
--ld=vlink -bamigahunk -x -Bstatic -Cvbcc -nostdlib -mrel targets/m68k-amigaos/lib/startup.o %s %s -Ltargets/m68k-amigaos/lib/ -lvc -o %s
--l2=vlink -bamigahunk -x -Bstatic -Cvbcc -nostdlib -mrel %s %s -Ltargets/m68k-amigaos/lib/ -o %s
--ldv=vlink -bamigahunk -t -x -Bstatic -Cvbcc -nostdlib -mrel targets/m68k-amigaos/lib/startup.o %s %s -Ltargets/m68k-amigaos/lib/ -lvc -o %s
--l2v=vlink -bamigahunk -t -x -Bstatic -Cvbcc -nostdlib -mrel %s %s -Ltargets/m68k-amigaos/lib/ -o %s
+-ld=vlink -bamigahunk -x -Bstatic -Cvbcc -nostdlib -mrel /home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/lib/startup.o %s %s -L/home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/lib/ -lvc -o %s
+-l2=vlink -bamigahunk -x -Bstatic -Cvbcc -nostdlib -mrel %s %s -L/home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/lib/ -o %s
+-ldv=vlink -bamigahunk -t -x -Bstatic -Cvbcc -nostdlib -mrel /home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/lib/startup.o %s %s -L/home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/lib/ -lvc -o %s
+-l2v=vlink -bamigahunk -t -x -Bstatic -Cvbcc -nostdlib -mrel %s %s -L/home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/lib/ -o %s
 -ldnodb=-s -Rshort
 -ul=-l%s
 -cf=-F%s
 -ml=500
 -hunkdebug
 -amiga-softfloat
+

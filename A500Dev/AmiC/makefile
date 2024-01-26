@@ -4,7 +4,7 @@ run		:	HDD/main.exe
 
 
 HDD/main.exe	:	main.c
-	vc +config/aos68k -o HDD/main.exe main.c
+	vc +config/aos68k -o ./HDD/main.exe main.c
 
 clean	:
 		rm -rf main.s main.o HDD/main.exe
