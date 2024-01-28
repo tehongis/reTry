@@ -6,9 +6,20 @@
 #include "custom_defines.h"
 
 // https://github.com/spec-chum/Amiga-Scoopex-C/blob/master/tut5/tut5.c
-// 
 // https://codetapper.com/amiga/sprite-tricks/risky-woods/
+// https://github.com/pararaum/amigaexamples/blob/master/examples/dual_playfield/dual.c
 
+// Old-style declaration from <clib/exec_protos.h>
+// BYTE AllocSignal(LONG signalNum);
+// The new declaration from <proto/exec.h>
+// BYTE __AllocSignal(__reg("a6") void *, __reg("d0") LONG signalNum)="\tjsr\t-330(a6)";
+// #define AllocSignal(signalNum) __AllocSignal(SysBase, (signalNum))
+//
+
+
+// place our copperlist in chipmem
+// UBYTE *clptr = AllocMem(sizeof(copperlist), MEMF_CHIP);
+// CopyMem(copperlist, clptr, sizeof(copperlist));
 
 //struct ExecBase *SysBase;
 
@@ -22,6 +33,9 @@ struct copinit *oldCopinit;
 
 //__far extern struct Custom custom;
 //__far extern struct CIA ciaa, ciab;
+
+// AllocMem(size,MEMF_CHIP);
+// alleyrainnight-640x640x5-interleave.raw
 
 void WaitRaster(ULONG raster)
 {
