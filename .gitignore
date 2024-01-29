@@ -5,3 +5,4 @@ A500Dev/Demo/listfile.txt
 *.exe
 A500Dev/ctest/a.out
 A500Dev/AmiC/main.asm
+A500Dev/AmiC/main.o

@@ -22,8 +22,8 @@ HDD/main.exe	:	main.o
 main.o	:	main.asm
 		vasmm68k_mot -Fhunk main.asm -o main.o
 	
-main.s 	: main.c
-		vbccm68k -c99 -lamiga -lauto -I/home/thongisto/Srcs/AmigaIncludes/ndk_3.1/includes\&libs/include_h/ -I/home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/ main.c
+main.asm 	: main.c
+		vbccm68k -c99 -I/home/thongisto/Srcs/AmigaIncludes/ndk_3.1/includes\&libs/include_h/ -I/home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/ main.c
 
 clean	:
 		rm -rf main.s main.o HDD/main.exe
