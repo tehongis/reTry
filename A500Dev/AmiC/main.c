@@ -31,11 +31,19 @@ volatile struct CIA *ciaa = (struct CIA *)0xbfe001;
 struct GfxBase *GfxBase;
 struct copinit *oldCopinit;
 
+//incbin "alleyrainnight-640x640x5-colors-after.raw"
+
 //__far extern struct Custom custom;
 //__far extern struct CIA ciaa, ciab;
 
+<<<<<<< HEAD
+=======
 // AllocMem(size,MEMF_CHIP);
 // alleyrainnight-640x640x5-interleave.raw
+//__attribute__((section("rawimage.MEMF_CHIP"))) UBYTE imagedata[] = {1,2,3,5};
+INCBIN(logorawdata,"alleyrainnight-640x640x5-colors-after.raw");
+
+>>>>>>> 13fab31 (update)
 
 void WaitRaster(ULONG raster)
 {

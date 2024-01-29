@@ -1,5 +1,5 @@
-/*		Custom Chip Defines
-
+/*
+		Custom Chip Defines
 		Access Key:
 		R: READ    W: WRITE    O: OCS    E: ECS    A: AGA
 */
