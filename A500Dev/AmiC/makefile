@@ -1,6 +1,15 @@
 
+
+ifeq ($(OS),Windows_NT)
+	RUNEMU = "C:\Program Files\WinUAE\winuae64.exe" -config=A500DevHDD.uae -s use_gui=no
+	CLEAN = del
+else
+	RUNEMU = fs-uae A500plus.fs-uae
+	CLEAN = rm 
+endif
+
 run		:	HDD/main.exe
-	fs-uae A500plus.fs-uae
+	$(RUNEMU)
 
 HDD/main.exe	:	main.o
 		vlink \
@@ -11,19 +20,18 @@ HDD/main.exe	:	main.o
 			-Cvbcc \
 			-nostdlib \
 			-mrel \
-			/home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/lib/startup.o \
+			m68k-amigaos/lib/startup.o \
 			main.o \
-			-L/home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/lib/ \
+			-Lm68k-amigaos/lib/ \
 			-lvc \
 			-o HDD/main.exe
 
-#	alleyrainnight-640x640x5-colors-after.raw
-
 main.o	:	main.asm
-		vasmm68k_mot -Fhunk main.asm -o main.o
+		vasmm68k_mot -Fhunk main.asm -o main.o -L listfile.txt
 	
 main.asm 	: main.c
-		vbccm68k -c99 -I/home/thongisto/Srcs/AmigaIncludes/ndk_3.1/includes\&libs/include_h/ -I/home/thongisto/Srcs/AmigaIncludes/vbcc_target_m68k-amigaos/targets/m68k-amigaos/ main.c
+		vbccm68k -c99 -Im68k-amigaos/include/ -Indk31/include_h/ main.c
 
 clean	:
-		rm -rf main.s main.o HDD/main.exe
+		$(CLEAN) main.s main.o HDD\main.exe
+
