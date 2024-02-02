@@ -1,3 +1,12 @@
+
+
+// https://github.com/spec-chum/Amiga-Scoopex-C/blob/master/tut5/tut5.c
+// https://codetapper.com/amiga/sprite-tricks/risky-woods/
+// https://github.com/pararaum/amigaexamples/blob/master/examples/dual_playfield/dual.c
+
+//#include <proto/exec.h>
+//struct ExecBase *SysBase;
+
 #include <hardware/custom.h>
 #include <hardware/cia.h>
 #include <hardware/dmabits.h>
@@ -5,25 +14,38 @@
 #include "helpers.h"
 #include "custom_defines.h"
 
-// https://github.com/spec-chum/Amiga-Scoopex-C/blob/master/tut5/tut5.c
-// https://codetapper.com/amiga/sprite-tricks/risky-woods/
-// https://github.com/pararaum/amigaexamples/blob/master/examples/dual_playfield/dual.c
 
-// Old-style declaration from <clib/exec_protos.h>
-// BYTE AllocSignal(LONG signalNum);
-// The new declaration from <proto/exec.h>
-// BYTE __AllocSignal(__reg("a6") void *, __reg("d0") LONG signalNum)="\tjsr\t-330(a6)";
-// #define AllocSignal(signalNum) __AllocSignal(SysBase, (signalNum))
-//
+#define INCBIN(name, file) INCBIN_SECTION(name, file, ".rodata", "")
+#define INCBIN_CHIP(name, file) INCBIN_SECTION(name, file, ".INCBIN.MEMF_CHIP", "aw")
+#define INCBIN_SECTION(name, file, section, flags) \
+    __asm__(".pushsection " #section ", " #flags "\n" \
+            ".global incbin_" #name "_start\n" \
+            ".type incbin_" #name "_start, @object\n" \
+            ".balign 2\n" \
+            "incbin_" #name "_start:\n" \
+            ".incbin \"" file "\"\n" \
+            \
+            ".global incbin_" #name "_end\n" \
+            ".type incbin_" #name "_end, @object\n" \
+            ".size incbin_" #name "_start, incbin_" #name "_end - incbin_" #name "_start\n" \
+            ".balign 1\n" \
+            "incbin_" #name "_end:\n" \
+            ".byte 0\n" \
+			".popsection\n" \
+    ); \
+    extern const __attribute__((aligned(2))) char incbin_ ## name ## _start[1024*1024]; \
+	extern const void* incbin_ ## name ## _end;\
+    const void* name = &incbin_ ## name ## _start;
 
 
 // place our copperlist in chipmem
 // UBYTE *clptr = AllocMem(sizeof(copperlist), MEMF_CHIP);
 // CopyMem(copperlist, clptr, sizeof(copperlist));
 
-//struct ExecBase *SysBase;
 
 /* Common structs */
+extern struct ExecBase* SysBase;
+
 #define CUSTOMBASE	0xdff000	// Custom chip base address
 volatile struct Custom *custom = (struct Custom *)CUSTOMBASE;
 volatile struct CIA *ciaa = (struct CIA *)0xbfe001;
@@ -31,15 +53,15 @@ volatile struct CIA *ciaa = (struct CIA *)0xbfe001;
 struct GfxBase *GfxBase;
 struct copinit *oldCopinit;
 
-//incbin "alleyrainnight-640x640x5-colors-after.raw"
+
 
 //__far extern struct Custom custom;
 //__far extern struct CIA ciaa, ciab;
 
 // AllocMem(size,MEMF_CHIP);
-// alleyrainnight-640x640x5-interleave.raw
-// __attribute__((section("rawimage.MEMF_CHIP"))) UBYTE imagedata[] = {1,2,3,5};
-// INCBIN(logorawdata,"alleyrainnight-640x640x5-colors-after.raw");
+
+
+INCBIN_CHIP(imageraw, "alleyrainnight-640x640x5-colors-after.raw");
 
 
 void WaitRaster(ULONG raster)
