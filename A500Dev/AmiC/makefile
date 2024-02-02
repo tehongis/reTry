@@ -23,7 +23,6 @@ HDD/main.exe	:	main.o
 			m68k-amigaos/lib/startup.o \
 			main.o \
 			-Lm68k-amigaos/lib/ \
-			-lvc \
 			-o HDD/main.exe
 
 main.o	:	main.asm

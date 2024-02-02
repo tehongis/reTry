@@ -11,42 +11,21 @@
 #include <hardware/cia.h>
 #include <hardware/dmabits.h>
 
-#include "helpers.h"
 #include "custom_defines.h"
 
-
-#define INCBIN(name, file) INCBIN_SECTION(name, file, ".rodata", "")
-#define INCBIN_CHIP(name, file) INCBIN_SECTION(name, file, ".INCBIN.MEMF_CHIP", "aw")
-#define INCBIN_SECTION(name, file, section, flags) \
-    __asm__(".pushsection " #section ", " #flags "\n" \
-            ".global incbin_" #name "_start\n" \
-            ".type incbin_" #name "_start, @object\n" \
-            ".balign 2\n" \
-            "incbin_" #name "_start:\n" \
-            ".incbin \"" file "\"\n" \
-            \
-            ".global incbin_" #name "_end\n" \
-            ".type incbin_" #name "_end, @object\n" \
-            ".size incbin_" #name "_start, incbin_" #name "_end - incbin_" #name "_start\n" \
-            ".balign 1\n" \
-            "incbin_" #name "_end:\n" \
-            ".byte 0\n" \
-			".popsection\n" \
-    ); \
-    extern const __attribute__((aligned(2))) char incbin_ ## name ## _start[1024*1024]; \
-	extern const void* incbin_ ## name ## _end;\
-    const void* name = &incbin_ ## name ## _start;
+#define CMOVE(addr, data) addr, data
+#define CWAIT(vhpos, flags) vhpos, flags
+#define CEND 0xffff, 0xfffe
 
 
-// place our copperlist in chipmem
-// UBYTE *clptr = AllocMem(sizeof(copperlist), MEMF_CHIP);
-// CopyMem(copperlist, clptr, sizeof(copperlist));
+__asm(
+	".section \"image_raw,data\",chip \n.global image_raw_start\n.incbin \"alleyrainnight-640x640x5-colors-after.raw\"\n.global image_raw_end\n"\
+	);
 
 
 /* Common structs */
 extern struct ExecBase* SysBase;
 
-#define CUSTOMBASE	0xdff000	// Custom chip base address
 volatile struct Custom *custom = (struct Custom *)CUSTOMBASE;
 volatile struct CIA *ciaa = (struct CIA *)0xbfe001;
 
@@ -55,14 +34,11 @@ struct copinit *oldCopinit;
 
 
 
+
 //__far extern struct Custom custom;
 //__far extern struct CIA ciaa, ciab;
 
 // AllocMem(size,MEMF_CHIP);
-
-
-INCBIN_CHIP(imageraw, "alleyrainnight-640x640x5-colors-after.raw");
-
 
 void WaitRaster(ULONG raster)
 {
@@ -140,3 +116,4 @@ int main(int argc, char **argv) {
  return 0;
 
 }
+
