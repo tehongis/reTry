@@ -7,21 +7,42 @@
 //#include <proto/exec.h>
 //struct ExecBase *SysBase;
 
+// Maybe compile with?
+// 
+// vasmm68k_mot -Fhunk -o=foo.o foo.s
+// vlink -bamigahunk -o=foo foo.o vbcc:startup.o vbcc:libvc.a
+//
+
 #include <hardware/custom.h>
 #include <hardware/cia.h>
 #include <hardware/dmabits.h>
 
-#include "custom_defines.h"
+#include "support_includes/custom_defines.h"
 
 #define CMOVE(addr, data) addr, data
 #define CWAIT(vhpos, flags) vhpos, flags
 #define CEND 0xffff, 0xfffe
 
+__asm("SECTION image,DATA_C\n.incbin \"alleyrainnight-640x640x5-colors-after.raw\"");
 
-__asm(
-	".section \"image_raw,data\",chip \n.global image_raw_start\n.incbin \"alleyrainnight-640x640x5-colors-after.raw\"\n.global image_raw_end\n"\
-	);
+short mul(short a, short b)
+{
+  register short result __asm("d0"); // declare a register variable
+  result = a; // assign the first operand to the register
+  asm("mulu (a7)+,d0\n"); // multiply the register by the second operand
+  return result; // return the result
+}
 
+//.section "image_raw,data",chip,"ra"
+//.global image_raw_start
+//.incbin "alleyrainnight-640x640x5-colors-after.raw"
+//.global image_raw_end
+
+/* inline asm incbin
+SECTION Image,DATA_C
+.incbin "logo.raw"
+extern unsigned char *Image __section("Image");
+*/
 
 /* Common structs */
 extern struct ExecBase* SysBase;
@@ -31,9 +52,6 @@ volatile struct CIA *ciaa = (struct CIA *)0xbfe001;
 
 struct GfxBase *GfxBase;
 struct copinit *oldCopinit;
-
-
-
 
 //__far extern struct Custom custom;
 //__far extern struct CIA ciaa, ciab;

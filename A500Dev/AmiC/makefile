@@ -11,25 +11,8 @@ endif
 run		:	HDD/main.exe
 	$(RUNEMU)
 
-HDD/main.exe	:	main.o
-		vlink \
-			-bamigahunk \
-			-t \
-			-x \
-			-Bstatic \
-			-Cvbcc \
-			-nostdlib \
-			-mrel \
-			m68k-amigaos/lib/startup.o \
-			main.o \
-			-Lm68k-amigaos/lib/ \
-			-o HDD/main.exe
-
-main.o	:	main.asm
-		vasmm68k_mot -Fhunk main.asm -o main.o -L listfile.txt
-	
-main.asm 	: main.c
-		vbccm68k -c99 -Im68k-amigaos/include/ -Indk31/include_h/ main.c
+HDD/main.exe	:	main.c
+		vc +aos68km -o HDD/main.exe main.c
 
 clean	:
 		$(CLEAN) main.s main.o HDD\main.exe
