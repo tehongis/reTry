@@ -11,6 +11,9 @@ endif
 run		:	HDD/main.exe
 	$(RUNEMU)
 
+image.bin		: image.s
+		vasmm68k_mot.exe -linedebug -Fhunk -o image.bin .\image.s
+
 HDD/main.exe	:	main.c
 		vc +aos68km -o HDD/main.exe main.c
 

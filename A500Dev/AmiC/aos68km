@@ -4,7 +4,7 @@
 -asv=vasmm68k_mot -Fhunk -nowarn=62 %s -o %s
 -rm=del %s
 -rmv=del %s
--ld=vlink -bamigahunk -x -Bstatic -Cvbcc -nostdlib -mrel ./m68k-amigaos/lib/minstart.o %s %s -L./m68k-amigaos/lib -lvc -o %s
+-ld=vlink -bamigahunk -x -Bstatic -Cvbcc -nostdlib  -mrel ./m68k-amigaos/lib/startup.o ./image.bin %s %s -L./m68k-amigaos/lib -lvc -lamiga -o %s
 -l2=vlink -bamigahunk -x -Bstatic -Cvbcc -nostdlib -mrel %s %s -L./m68k-amigaos/lib -o %s
 -ldv=vlink -bamigahunk -t -x -Bstatic -Cvbcc -nostdlib -mrel ./m68k-amigaos/lib/minstart.o %s %s -L./m68k-amigaos/lib -lvc -o %s
 -l2v=vlink -bamigahunk -t -x -Bstatic -Cvbcc -nostdlib -mrel %s %s -L./m68k-amigaos/lib -o %s
