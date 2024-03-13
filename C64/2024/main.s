@@ -12,7 +12,7 @@ init:
 
 	jsr copyrom
 
-	;jsr initsound
+	jsr initsound
 
 	jsr	sprrandompositions
 
@@ -134,7 +134,7 @@ voice1:
 
 	lda #$00
 	sta $d400	;freq lo
-	lda #$04
+	lda #$02
 	sta $d401	;freq hi
 
 	lda #$00
@@ -151,9 +151,9 @@ voice2:
 	lda #$ff
 	sta $d40d	;SR
 
-	lda #$03
+	lda #$01
 	sta $d407	;freq lo
-	lda #$04
+	lda #$02
 	sta $d408	;freq hi
 
 	lda #$00
