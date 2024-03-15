@@ -2,6 +2,7 @@
 
 	include "includes/LVOs.i"
 	include "includes/Hards.i"
+	include "includes/dmabits.i"
 
 execBase	equ 	$4
 customBase	equ		$dff000
@@ -63,10 +64,14 @@ main
 	move.w 	#$0000,SPR6CTL(a6)
 	move.w 	#$0000,SPR7CTL(a6)
 
+
+	lea		customBase,a6
 	move.w	#$8200,DMACON(a6)
 	lea		mycopper,a0
 	move.l	a0,COP1LCH(a6)
 
+
+	lea		customBase,a6
 	move.w	#$3fff,INTENA(a6)
 	move.w	#$3fff,INTENA(a6)	;somewhere someone recommended two times
 	lea		myVBI,a0
@@ -154,8 +159,16 @@ main
 myVBI
 	movem.l	d0-d7/a0-a6,-(sp)
 
+	lea		customBase,a6
+	move.w	#$0f0,COLOR0(a6)
+	jsr		fillarea
+	lea		customBase,a6
+	move.w	#$000,COLOR0(a6)
+
+	lea		customBase,a6
 	move.w	#$00f,COLOR0(a6)
 	jsr		pt_Music
+	lea		customBase,a6
 	move.w	#$000,COLOR0(a6)
 
 
@@ -163,11 +176,16 @@ myVBI
 	move.w	sinecounter,d0
 	and.w	#$0ffe,d0
 	move.w	(a0,d0),d0
-	lsr.w	#2,d0
-	add.w	#$a0,d0
-	lsl.w	#8,d0
-	or.w	#$0007,d0
+;	lsl.w	#8,d0
+;	or.w	#$0007,d0
 ;	move.w	d0,mycopper+8*11
+
+	lea		bitmap,a0
+	add.l	#$1000,a0
+	add.w   #$0200,d0
+	and.w	#$0ffe,d0
+
+	eor.w	#$ffff,(a0,d0.w)
 	add		#22,sinecounter
 
 	lea		customBase,a6
@@ -177,6 +195,81 @@ myVBI
 
 
 
+
+fillarea
+
+
+
+;                    AREA MODE ("normal")
+;                 -------------------------
+;                 BIT# BLTCON0     BLTCON1
+;                 ---- -------     -------
+;                 15   ASH3        BSH3
+;                 14   ASH2        BSH2
+;                 13   ASH1        BSH1
+;                 12   ASA0        BSH0
+;                 11   USEA         X
+;                 10   USEB         X
+;                 09   USEC         X
+;                 08   USED         X
+;                 07   LF7          DOFF
+;                 06   LF6          X
+;                 05   LF5          X
+;                 04   LF4         EFE
+;                 03   LF3         IFE
+;                 02   LF2         FCI
+;                 01   LF1         DESC
+;                 00   LF0         LINE(=0)
+;
+;                 ASH3-0  Shift value of A source
+;                 BSH3-0  Shift value of B source
+;                 USEA    Mode control bit to use source A
+;                 USEB    Mode control bit to use source B
+;                 USEC    Mode control bit to use source C
+;                 USED    Mode control bit to use destination D
+;                 LF7-0   Logic function minterm select lines
+;                 EFE     Exclusive fill enable
+;                 IFE     Inclusive fill enable
+;                 FCI     Fill carry input
+;                 DESC    Descending (decreasing address) control bit
+;                 LINE    Line mode control bit (set to 0)
+
+
+;Calculating LF Bytes
+;Instead of calculating your LF-bytes all the time you can do this
+;A  EQU   %11110000
+;B  EQU   %11001100
+;C  EQU   %10101010
+;So when you need an lf-byte you can just type:
+;	move.w   #(A!B)&C,d0
+
+
+height	equ 128
+width	equ 320
+
+
+	lea		customBase,a6
+.waitblit
+    btst.b  #DMAB_BLTDONE-8,DMACONR(a6)
+    bne     .waitblit
+
+	lea		bitmap,a0
+	move.l	a0,BLTAPT(a6)
+	move.l	a0,BLTDPT(a6)
+	move.w	#$0040,BLTAMOD(a6)
+	move.w	#$0040,BLTDMOD(a6)
+
+	move.w	#$19f0,BLTCON0(a6)
+	move.w	#$0000,BLTCON1(a6)
+	
+   	move.w   #64*height+width/2,BLTSIZE(a6)	
+
+	lea		customBase,a6
+.waitblit2
+    btst.b  #DMAB_BLTDONE-8,DMACONR(a6)
+    bne     .waitblit2
+
+	rts
 
 ; ---------------------- Variables
 oldVBI		dc.l	0
