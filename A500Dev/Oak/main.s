@@ -5,14 +5,22 @@
 	include "includes/dmabits.i"
 	include "includes/exec/types.i"
 	include "includes/hardware/blit.i"
+	include "includes/hardware/blitbits.i"
 
 ;	include 'hardware/custom.i'
 ;	include 'hardware/dmabits.i'
 ;	include 'hardware/hw_examples.i'
 
 
+DEBUG	macro   color
+		move.w 	#color,$dff180.l
+        endm
+
 execBase	equ 	$4
 customBase	equ		$dff000
+
+height		equ 256
+width		equ 320
 
 
 	section mycode,code
@@ -167,29 +175,36 @@ main
 myVBI
 	movem.l	d0-d7/a0-a6,-(sp)
 
-	lea		customBase,a6
-	move.w	#$0f0,COLOR0(a6)
-	jsr		fillarea
-	lea		customBase,a6
-	move.w	#$000,COLOR0(a6)
 
-
-	move.w	#020,d0
-	move.w	#020,d1
-	move.w	#220,d2
-	move.w	#200,d3
-	move.w	#320,d4
-	lea		bitmap,a0	
-	jsr		simpleline
-
-
-
+;	jsr		scrollarea
 
 	lea		customBase,a6
-	move.w	#$00f,COLOR0(a6)
+
+	DEBUG	0x0f0
+	move.w	#000,d0
+	move.w	#000,d1
+	move.w	#319,d2
+	move.w	#255,d3
+	lea		bitmap,a0
+	jsr		BlitterLine
+	DEBUG	0x000
+
+
+	DEBUG	0x0f0
+	move.w	#319,d0
+	move.w	#000,d1
+	move.w	#000,d2
+	move.w	#255,d3
+	lea		bitmap,a0
+	jsr		BlitterLine
+	DEBUG	0x000
+
+
+	DEBUG	0x00f
 	jsr		pt_Music
 	lea		customBase,a6
-	move.w	#$000,COLOR0(a6)
+	DEBUG	0x000
+
 
 
 	lea		sine,a0
@@ -214,42 +229,10 @@ myVBI
 	rte
 
 
-fillarea
-;                    AREA MODE ("normal")
-;                 -------------------------
-;                 BIT# BLTCON0     BLTCON1
-;                 ---- -------     -------
-;                 15   ASH3        BSH3
-;                 14   ASH2        BSH2
-;                 13   ASH1        BSH1
-;                 12   ASA0        BSH0
-;                 11   USEA         X
-;                 10   USEB         X
-;                 09   USEC         X
-;                 08   USED         X
-;                 07   LF7          DOFF
-;                 06   LF6          X
-;                 05   LF5          X
-;                 04   LF4         EFE
-;                 03   LF3         IFE
-;                 02   LF2         FCI
-;                 01   LF1         DESC
-;                 00   LF0         LINE(=0)
-;
-;                 ASH3-0  Shift value of A source
-;                 BSH3-0  Shift value of B source
-;                 USEA    Mode control bit to use source A
-;                 USEB    Mode control bit to use source B
-;                 USEC    Mode control bit to use source C
-;                 USED    Mode control bit to use destination D
-;                 LF7-0   Logic function minterm select lines
-;                 EFE     Exclusive fill enable
-;                 IFE     Inclusive fill enable
-;                 FCI     Fill carry input
-;                 DESC    Descending (decreasing address) control bit
-;                 LINE    Line mode control bit (set to 0)
 
+; -------------------- ScrollArea
 
+scrollarea
 ;Calculating LF Bytes
 ;Instead of calculating your LF-bytes all the time you can do this
 ;A  EQU   %11110000
@@ -258,12 +241,9 @@ fillarea
 ;So when you need an lf-byte you can just type:
 ;	move.w   #(A!B)&C,d0
 
-
-height	equ 128
-width	equ 320
-
-
 	lea		customBase,a6
+
+    btst.b  #DMAB_BLTDONE-8,DMACONR(a6)
 .waitblit
     btst.b  #DMAB_BLTDONE-8,DMACONR(a6)
     bne     .waitblit
@@ -277,130 +257,140 @@ width	equ 320
 	move.w	#$19f0,BLTCON0(a6)
 	move.w	#$0000,BLTCON1(a6)
 	
-   	move.w   #64*height+width/2,BLTSIZE(a6)	
-
-	lea		customBase,a6
-.waitblit2
-    btst.b  #DMAB_BLTDONE-8,DMACONR(a6)
-    bne     .waitblit2
-
+   	move.w   #64*320+128/2,BLTSIZE(a6)
 	rts
+
+
 
 
 
 ; -------------------- Linedraw
+	
+;LINE_MINTERM	=	$4a		; xor
+LINE_MINTERM	=	$ca		; or
 
-;   Input:  d0=x1 d1=y1 d2=x2 d3=y2 d4=width a0=aptr
+;----------------------------------------------------------------------------------
+; Draw regular blitter line
 ;
+; The routine assumes that the blitter is idle when called
+; The routine will exit with the blitter active
 ;
-;   Our entry point.
-;
-simpleline:
-        lea     customBase,a1      ; snarf up the custom address register
-        sub.w   d0,d2           ; calculate dx
-        bmi     xneg            ; if negative, octant is one of [3,4,5,6]
-        sub.w   d1,d3           ; calculate dy   ''   is one of [1,2,7,8]
-        bmi     yneg            ; if negative, octant is one of [7,8]
-        cmp.w   d3,d2           ; cmp |dx|,|dy|  ''   is one of [1,2]
-        bmi     ygtx            ; if y>x, octant is 2
-        moveq.l #OCTANT1+LINEMODE,d5    ; otherwise octant is 1
-        bra     lineagain       ; go to the common section
-ygtx:
-        exg     d2,d3           ; X must be greater than Y
-        moveq.l #OCTANT2+LINEMODE,d5    ; we are in octant 2
-        bra     lineagain       ; and common again.
-yneg:
-        neg.w   d3              ; calculate abs(dy)
-        cmp.w   d3,d2           ; cmp |dx|,|dy|, octant is [7,8]
-        bmi     ynygtx          ; if y>x, octant is 7
-        moveq.l #OCTANT8+LINEMODE,d5    ; otherwise octant is 8
-        bra     lineagain
-ynygtx:
-        exg     d2,d3           ; X must be greater than Y
-        moveq.l #OCTANT7+LINEMODE,d5    ; we are in octant 7
-        bra     lineagain
-xneg:
-        neg.w   d2              ; dx was negative! octant is [3,4,5,6]
-        sub.w   d1,d3           ; we calculate dy
-        bmi     xyneg           ; if negative, octant is one of [5,6]
-        cmp.w   d3,d2           ; otherwise it's one of [3,4]
-        bmi     xnygtx          ; if y>x, octant is 3
-        moveq.l #OCTANT4+LINEMODE,d5    ; otherwise it's 4
-        bra     lineagain
-xnygtx:
-        exg     d2,d3           ; X must be greater than Y
-        moveq.l #OCTANT3+LINEMODE,d5    ; we are in octant 3
-        bra     lineagain
-xyneg:
-        neg.w   d3              ; y was negative, in one of [5,6]
-        cmp.w   d3,d2           ; is y>x?
-        bmi     xynygtx         ; if so, octant is 6
-        moveq.l #OCTANT5+LINEMODE,d5    ; otherwise, octant is 5
-        bra     lineagain
-xynygtx:
-        exg     d2,d3           ; X must be greater than Y
-        moveq.l #OCTANT6+LINEMODE,d5    ; we are in octant 6
-lineagain:
-        mulu.w  d4,d1           ; Calculate y1 * width
-        ror.l   #4,d0           ; move upper four bits into hi word
-        add.w   d0,d0           ; multiply by 2
-        add.l   d1,a0           ; ptr += (x1 >> 3)
-        add.w   d0,a0           ; ptr += y1 * width
-        swap    d0              ; get the four bits of x1
-        or.w    #$BFA,d0        ; or with USEA, USEC, USED, F=A+C
-        lsl.w   #2,d3           ; Y = 4 * Y
-        add.w   d2,d2           ; X = 2 * X
-        move.w  d2,d1           ; set up size word
-        lsl.w   #5,d1           ; shift five left
-        add.w   #$42,d1         ; and add 1 to height, 2 to width
-        btst    #DMAB_BLTDONE-8,DMACONR(a1)     ; safety check
-waitblit:
-        btst    #DMAB_BLTDONE-8,DMACONR(a1)     ; wait for blitter
-        bne     waitblit
-        move.w  d3,BLTBMOD(a1)  ; B mod = 4 * Y
-        sub.w   d2,d3
-        ext.l   d3
-        move.l  d3,BLTAPT(a1)   ; A ptr = 4 * Y - 2 * X
-        bpl     lineover        ; if negative,
-        or.w    #SIGNFLAG,d5    ; set sign bit in con1
-lineover:
-        move.w  d0,BLTCON0(a1)  ; write control registers
-        move.w  d5,BLTCON1(a1)
-        move.w  d4,BLTCMOD(a1)  ; C mod = bitplane width
-        move.w  d4,BLTDMOD(a1)  ; D mod = bitplane width
-        sub.w   d2,d3
-        move.w  d3,BLTAMOD(a1)  ; A mod = 4 * Y - 4 * X
-        move.w  #$8000,BLTADAT(a1)      ; A data = 0x8000
-        moveq.l #-1,d5          ; Set masks to all ones
-        move.l  d5,BLTAFWM(a1)  ; we can hit both masks at once
-        move.l  a0,BLTCPT(a1)   ; Pointer to first pixel to set
-        move.l  a0,BLTDPT(a1)
-        move.w  d1,BLTSIZE(a1)  ; Start blit
+; 	parameters
+;	d0.w	x0
+;	d1.w	y0
+;	d2.w	x1
+;	d3.w	y1
+;	a0		bitplane
+;	a6		$dff000
 
-	lea		customBase,a6
+BlitterLine
+		lea		customBase,a6
+
+    btst.b  #DMAB_BLTDONE-8,DMACONR(a6)
 .waitblit
     btst.b  #DMAB_BLTDONE-8,DMACONR(a6)
-    bne     .waitblit			
-    
-	rts
+    bne     .waitblit
 
+		move.w	#320/8,d4
 
+		move.w	d4,a1
+		
+		cmp.w	d1,d3
+		bge.s	.downward
+		exg	d0,d2
+		exg	d1,d3
+.downward
 
+		sub.w	d0,d2
+		sub.w	d1,d3
+		
+		move.w	d2,d4
+		bpl.s	.positiveDX
+		neg.w	d4
+.positiveDX
+		move.w	d3,d5
+		bpl.s	.positiveDY
+		neg.w	d5
+.positiveDY
+		move.w	d4,d6
+		sub.w	d5,d6
+		add.l	d6,d6
+		move.w	d3,d6
+		add.l	d6,d6
+		move.w	d2,d6
+		add.l	d6,d6
+		swap	d6
+		and.w	#7,d6
+		lea	.octant_lookup,a2
+		move.b	(a2,d6.w),d6
+		or.w	#BLTCON1F_LINE,d6
 
+		cmp.w	d4,d5
+		bls.s	.absDyLessThanAbsDx
+		exg	d4,d5
+.absDyLessThanAbsDx
 
+		move.w	d5,d7
+		add.w	d7,d7
+		sub.w	d4,d7
+		add.w	d7,d7
+		ext.l	d7
+		move.l	d7,BLTAPT(a6)
+		bpl.s	.positiveGradient
+		or.w	#BLTCON1F_SIGN,d6
+.positiveGradient
 
+		add.w	d4,d4
+		add.w	d4,d4
+		add.w	d5,d5
+		add.w	d5,d5
+		move.w	d5,BLTBMOD(a6)
+		sub.w	d4,d5
+		move.w	d5,BLTAMOD(a6)
+		lsr.w	#2,d4
 
+		move.w	#$8000,BLTADAT(a6)
+		move.l	#$ffffffff,BLTAFWM(a6)
 
+		move.w	d0,d2
+		and.w	#$f,d2
+		ror.w	#4,d2
+		
+		move.w	#$ffff,BLTBDAT(a6)
 
+		move.w	a1,d7
+		mulu.w	d1,d7
+		add.l	d7,a0
+		move.w	d0,d7
+		lsr.w	#4,d7
+		add.w	d7,d7
+		add.w	d7,a0
+		move.l	a0,BLTCPT(a6)
+		move.l	#blitter_temp_output_word,BLTDPT(a6)
+		
+		move.w	a1,BLTCMOD(a6)
+		move.w	a1,BLTDMOD(a6)
 
+		or.w	#BLTCON0F_USEA|BLTCON0F_USEC|BLTCON0F_USED|LINE_MINTERM,d2
+		move.w	d2,BLTCON0(a6)
+		move.w	d6,BLTCON1(a6)
 
+		addq.w	#1,d4
+		lsl.w	#6,d4
+		addq.w	#2,d4
+		move.w	d4,BLTSIZE(a6)
+		
+		rts
 
-
-
-
-
-
-
+.octant_lookup
+		dc.b	BLTCON1F_SUD				; octant 7
+		dc.b	BLTCON1F_SUD|BLTCON1F_AUL		; octant 4
+		dc.b	BLTCON1F_SUD|BLTCON1F_SUL		; octant 0
+		dc.b	BLTCON1F_SUD|BLTCON1F_SUL|BLTCON1F_AUL	; octant 3
+		dc.b	0					; octant 6
+		dc.b	BLTCON1F_SUL				; octant 5
+		dc.b	BLTCON1F_AUL				; octant 1
+		dc.b	BLTCON1F_SUL|BLTCON1F_AUL		; octant 2
 
 
 
@@ -417,10 +407,17 @@ oldadkcon	dc.l	0
 
 sinecounter	dc.w	0
 
+blitter_temp_output_word
+			ds.w	1
 
 graphicsname
 			db 	"graphics.library",0
 	even
+
+
+
+
+
 
 
 
@@ -454,18 +451,18 @@ bplpointers
 	dc.w	COLOR12,$0c00,COLOR13,$0333
 	dc.w	COLOR14,$0e00,COLOR15,$0111
 
-	dc.w	$2807,$fffe, COLOR0,$0100
-	dc.w	$2907,$fffe, COLOR0,$0400
-	dc.w	$2a07,$fffe, COLOR0,$0800
-	dc.w	$2b07,$fffe, COLOR0,$0f00
-	dc.w	$2c07,$fffe, COLOR0,$0000
+;	dc.w	$2807,$fffe, COLOR0,$0100
+;	dc.w	$2907,$fffe, COLOR0,$0400
+;	dc.w	$2a07,$fffe, COLOR0,$0800
+;	dc.w	$2b07,$fffe, COLOR0,$0f00
+;	dc.w	$2c07,$fffe, COLOR0,$0000
 
 	dc.w	$ffdf,$fffe					;wait over 255 line
-	dc.w	$2c07,$fffe, COLOR0,$0f00
-	dc.w	$2d07,$fffe, COLOR0,$0800
-	dc.w	$2e07,$fffe, COLOR0,$0400
-	dc.w	$2f07,$fffe, COLOR0,$0100
-	dc.w	$3007,$fffe, COLOR0,$0000
+;	dc.w	$2c07,$fffe, COLOR0,$0f00
+;	dc.w	$2d07,$fffe, COLOR0,$0800
+;	dc.w	$2e07,$fffe, COLOR0,$0400
+;	dc.w	$2f07,$fffe, COLOR0,$0100
+;	dc.w	$3007,$fffe, COLOR0,$0000
 
 	dc.w	$ffff,$fffe
 
