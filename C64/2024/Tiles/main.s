@@ -2,7 +2,13 @@
 
 ; https://sta.c64.org/cbm64mem.html
 
+; 1000-1c00 music
 ; 3e00-4000 spriteforms
+
+SPRX	equ	$3c
+SPRY	equ	$4f
+SPRHI	equ	$ff
+
 
     org $0800
 basic:
@@ -21,7 +27,7 @@ init:
 
 	jsr initIRQ
 
-	lda #$00
+	lda #$01
 	jsr music
 
 
@@ -233,7 +239,10 @@ MyIRQ		;-------------------------------:
 
 	jsr	spriteUpdate
 	jsr	animateChars
-;	jsr music + 3
+
+	inc $d020
+	jsr music + 3
+	dec $d020
 
 	dec $d020
     rti
@@ -263,16 +272,16 @@ spriteUpdate
 	rts
 
 spritelocs:
-	db $38,$38
-	db $38,$50
-	db $38,$68
-	db $38,$80
-	db $38,$98
-	db $38,$b0
-	db $38,$c8
-	db $38,$e0
-	db $ff
+	db SPRX,SPRY+(21*0)
+	db SPRX,SPRY+(21*1)
+	db SPRX,SPRY+(21*2)
+	db SPRX,SPRY+(21*3)
+	db SPRX,SPRY+(21*4)
+	db SPRX,SPRY+(21*5)
+	db SPRX,SPRY+(21*6)
+	db SPRX,SPRY+(21*7)
+	db SPRHI
 
 	org $1000
 music
-	incbin "music.dat"
+	incbin "Superhero.dat",2 
