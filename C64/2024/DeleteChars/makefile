@@ -7,9 +7,9 @@ else
 	EMU=x64
 endif
 
-run			: demo.prg
-			$(EMU) -autostartprgmode 1 demo.prg
+run			: 2024.prg
+			$(EMU) -autostartprgmode 1 2024.prg
 
-demo.prg	:	main.s
-			$(CC) -Fbin -cbm-prg -o demo.prg main.s
+2024.prg	:	main.s
+			$(CC) -Fbin -cbm-prg -o 2024.prg main.s
 
