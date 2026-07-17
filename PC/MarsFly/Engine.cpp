@@ -151,7 +151,7 @@ void Engine::update(float deltaTime) {
     // KORJAUS: Vaihdettu SDL_SCANCODE_SPACE -> SDL_SCANCODE_LSHIFT äänen dynaamiseen liipaisuun
     bool isThrusting = keystate[SDL_SCANCODE_W] || keystate[SDL_SCANCODE_S] ||
                        keystate[SDL_SCANCODE_A] || keystate[SDL_SCANCODE_D] ||
-                       keystate[SDL_SCANCODE_LSHIFT] || keystate[SDL_SCANCODE_LCTRL];
+                       keystate[SDL_SCANCODE_SPACE] || keystate[SDL_SCANCODE_LCTRL];
 
 
     if (isThrusting) {

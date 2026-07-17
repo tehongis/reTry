@@ -17,8 +17,8 @@ void InputManager::processEvents(Camera& camera, bool& running) {
             if (event.key.keysym.sym == SDLK_ESCAPE) {
                 running = false;
             }
-            // UUSI TOIMINTO: Jos painetaan Space-näppäintä, katkaistaan köysi ja heitetään laatikko dynaamisesti
-            if (event.key.keysym.sym == SDLK_SPACE) {
+            // UUSI TOIMINTO: Jos painetaan F-näppäintä, katkaistaan köysi ja heitetään laatikko dynaamisesti
+            if (event.key.keysym.sym == SDLK_f) {
                 // Tarvitsemme viitteen CargoBoxiin. Koska processEvents ei ota sitä vastaan, 
                 // tämä suoritetaan helpoiten joko tässä (jos välitetään olio) tai alla updateFlightPhysics-metodissa.
                 // Säästetään tämä dynaamisen keystaten puolelle tai käsitellään se suoraan fysiikkapäivityksessä!
@@ -35,8 +35,8 @@ void InputManager::updateFlightPhysics(Camera& camera, Terrain& terrain, Landing
                                       CargoBox& cargoBox, float deltaTime) {
     const Uint8* keystate = SDL_GetKeyboardState(NULL);
 
-    // KORJAUS & UUSI TOIMINTO: Jos painetaan Space-näppäintä, katkaistaan köysi välittömästi
-    if (keystate[SDL_SCANCODE_SPACE]) {
+    // KORJAUS & UUSI TOIMINTO: Jos painetaan F-näppäintä, katkaistaan köysi välittömästi
+    if (keystate[SDL_SCANCODE_F]) {
         cargoBox.cutRope();
     }
 
@@ -46,8 +46,7 @@ void InputManager::updateFlightPhysics(Camera& camera, Terrain& terrain, Landing
     camera.moveStrafe(keystate[SDL_SCANCODE_D],   1.0f, deltaTime);
     camera.moveStrafe(keystate[SDL_SCANCODE_A],  -1.0f, deltaTime);
     
-    // KORJAUS: Vaihdettu SDL_SCANCODE_SPACE -> SDL_SCANCODE_LSHIFT nostoteholle
-    camera.moveUp(keystate[SDL_SCANCODE_LSHIFT], 1.0f, deltaTime);
+    camera.moveUp(keystate[SDL_SCANCODE_SPACE], 1.0f, deltaTime);
     camera.moveUp(keystate[SDL_SCANCODE_LCTRL], -1.0f, deltaTime);
 
     // Sovelletaan Marsin painovoimaa aluksen pystynopeuteen
