@@ -1,5 +1,6 @@
 #include "Camera.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <algorithm>
 
 Camera::Camera(glm::vec3 startPosition) {
     position = startPosition;
@@ -9,6 +10,11 @@ Camera::Camera(glm::vec3 startPosition) {
     front = glm::vec3(0.0f, 0.0f, -1.0f);
     up = glm::vec3(0.0f, 1.0f, 0.0f);
     right = glm::vec3(1.0f, 0.0f, 0.0f);
+    
+    // Alustetaan nopeudet nollaksi
+    velocityForward = 0.0f;
+    velocityStrafe = 0.0f;
+    velocityUp = 0.0f; // UUSI JÄSENMUUTTUJA PYSTYLIIKKEELLE
 }
 
 glm::mat4 Camera::getViewMatrix() {
@@ -33,14 +39,29 @@ void Camera::updateDirection(float xoffset, float yoffset) {
     up    = glm::normalize(glm::cross(right, front));
 }
 
-void Camera::moveForward(float speed) {
-    position += front * speed;
+void Camera::moveForward(bool active, float direction, float deltaTime) {
+    if (active) {
+        velocityForward += direction * ACCELERATION * deltaTime;
+        velocityForward = std::clamp(velocityForward, -MAX_SPEED, MAX_SPEED);
+    }
 }
 
-void Camera::moveStrafe(float speed) {
-    position += right * speed;
+void Camera::moveStrafe(bool active, float direction, float deltaTime) {
+    if (active) {
+        velocityStrafe += direction * ACCELERATION * deltaTime;
+        velocityStrafe = std::clamp(velocityStrafe, -MAX_SPEED, MAX_SPEED);
+    }
 }
 
-void Camera::moveUp(float speed) {
-    position.y += speed;
+// UUSI JA PARANNETTU METODI PYSTYSUUNTAISELLE OHJAUKSELLE
+void Camera::moveUp(bool active, float direction, float deltaTime) {
+    if (active) {
+        // ACCELERATION voi olla sama tai alukselle ominainen pystysuuntainen teho
+        velocityUp += direction * ACCELERATION * deltaTime;
+        velocityUp = std::clamp(velocityUp, -MAX_SPEED, MAX_SPEED);
+    }
+}
+
+void Camera::updatePosition(float /*deltaTime*/) {
+    // Jätetään tyhjäksi, liike lasketaan InputManagerissa
 }

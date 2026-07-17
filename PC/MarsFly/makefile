@@ -3,7 +3,7 @@ CXX      := g++
 CXXFLAGS := -Wall -Wextra -std=c++17 -O2
 
 # Järjestelmäkirjastot
-LIBS     := -lSDL2 -lGLEW -lGL -lm
+LIBS     := -lSDL2 -lGLEW -lGL -lm -lSDL2_mixer
 
 # Kohteet (Etsii automaattisesti kaikki .cpp tiedostot nykyisestä kansiosta)
 TARGET   := mars_terrain

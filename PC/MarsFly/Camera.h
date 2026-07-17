@@ -14,12 +14,26 @@ public:
     float yaw;
     float pitch;
 
+    // Aluksen nopeusmuuttujat
+    float velocityForward;
+    float velocityStrafe;
+    float velocityUp; // <--- LISÄÄ TÄMÄ RIVI TÄHÄN
+
+    // Vakiot (Varmista että nämä löytyvät tai säädä arvoja)
+    const float ACCELERATION = 20.0f;
+    const float MAX_SPEED = 15.0f;
+    const float DRAG = 0.15f;
+
     Camera(glm::vec3 startPosition);
     glm::mat4 getViewMatrix();
     void updateDirection(float xoffset, float yoffset);
-    void moveForward(float speed);
-    void moveStrafe(float speed);
-    void moveUp(float speed); // Uusi funktio pystysuuntaiseen liikkeeseen
+    void moveForward(bool active, float direction, float deltaTime);
+    void moveStrafe(bool active, float direction, float deltaTime);
+    
+    // Päivitä moveUp vastaamaan uutta muotoa:
+    void moveUp(bool active, float direction, float deltaTime); 
+    
+    void updatePosition(float deltaTime);
 };
 
 #endif

@@ -1,79 +1,72 @@
 #include "Terrain.h"
+#include "Noise.h"
 #include <cmath>
+#include <vector>
+#include <glm/glm.hpp>
 
-float Terrain::noise(int x, int z) {
-    int n = x + z * 57;
-    n = (n << 13) ^ n;
-    return (1.0f - ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0f);
-}
-
-float Terrain::getNoiseHeight(float x, float z) {
-    float total = 0.0f;
-    float frequency = 0.05f;
-    float amplitude = 12.0f;
-    for (int i = 0; i < 4; i++) {
-        total += noise(static_cast<int>(x * frequency), static_cast<int>(z * frequency)) * amplitude;
-        frequency *= 2.0f;
-        amplitude *= 0.4f;
-    }
-    return total;
+// Luokan oma metodi kutsuu nyt vapaata globaalia kohinafunktiota
+float Terrain::getHeight(float x, float z) {
+    // Poistettu Terrain:: domainWarpNoise -kutsun edestä
+    return domainWarpNoise(static_cast<float>(x), static_cast<float>(z));
 }
 
 void Terrain::generate(std::vector<float>& vertices, std::vector<unsigned int>& indices) {
+    const float terrainScale = 20.0f; 
+
+    // 1. Vaihe: Luodaan ja tallennetaan korkeudet taulukkoon (tämä pitää olla valmiina ennen normaalien laskentaa)
     for (int z = 0; z < MAP_SIZE; ++z) {
         for (int x = 0; x < MAP_SIZE; ++x) {
-            heightMap[z][x] = getNoiseHeight(static_cast<float>(x), static_cast<float>(z));
+            float rawNoise = getHeight(static_cast<float>(x), static_cast<float>(z));
+            heightMap[z][x] = rawNoise * terrainScale;
         }
     }
 
-    float normals[MAP_SIZE][MAP_SIZE][3];
+    // 2. Vaihe: Lasketaan normaalit ja rakennetaan vertex-puskuri (9 floatia per vertex)
     for (int z = 0; z < MAP_SIZE; ++z) {
         for (int x = 0; x < MAP_SIZE; ++x) {
-            float hL = (x > 0) ? heightMap[z][x-1] : heightMap[z][x];
-            float hR = (x < MAP_SIZE-1) ? heightMap[z][x+1] : heightMap[z][x];
-            float hD = (z > 0) ? heightMap[z-1][x] : heightMap[z][x];
-            float hU = (z < MAP_SIZE-1) ? heightMap[z+1][x] : heightMap[z][x];
-            
-            float nx = hL - hR;
-            float ny = 2.0f;
-            float nz = hD - hU;
-            float len = std::sqrt(nx*nx + ny*ny + nz*nz);
-            
-            normals[z][x][0] = nx / len;
-            normals[z][x][1] = ny / len;
-            normals[z][x][2] = nz / len;
-        }
-    }
+            float currentHeight = heightMap[z][x];
 
-    for (int z = 0; z < MAP_SIZE; ++z) {
-        for (int x = 0; x < MAP_SIZE; ++x) {
+            // Luetaan viereisten pisteiden korkeudet. Jos ollaan reunalla, käytetään nykyistä korkeutta.
+            float hLeft  = (x > 0) ? heightMap[z][x - 1] : currentHeight;
+            float hRight = (x < MAP_SIZE - 1) ? heightMap[z][x + 1] : currentHeight;
+            float hDown  = (z > 0) ? heightMap[z - 1][x] : currentHeight;
+            float hUp    = (z < MAP_SIZE - 1) ? heightMap[z + 1][x] : currentHeight;
+
+            // Lasketaan pinnan kallistus (tangentit) X- ja Z-akseleiden suuntaan
+            // Skaalauskerroin (2.0f) vastaa kahden pisteen välistä etäisyyttä datassa
+            glm::vec3 normal(hLeft - hRight, 2.0f, hDown - hUp);
+            normal = glm::normalize(normal);
+
+            // 1. PAIKKATIETO (Layout 0: 3 floatia)
             vertices.push_back(static_cast<float>(x));
-            vertices.push_back(heightMap[z][x]);
+            vertices.push_back(currentHeight); 
             vertices.push_back(static_cast<float>(z));
 
-            float hFactor = (heightMap[z][x] + 10.0f) / 25.0f;
-            if (hFactor < 0.0f) hFactor = 0.0f;
-            if (hFactor > 1.0f) hFactor = 1.0f;
-            vertices.push_back(0.6f + hFactor * 0.3f);
-            vertices.push_back(0.2f + hFactor * 0.15f);
-            vertices.push_back(0.1f + hFactor * 0.05f);
+            // 2. AITO NORMAALIVEKTORI VALAISTUKSELLE (Layout 1: 3 floatia)
+            vertices.push_back(normal.x);
+            vertices.push_back(normal.y);
+            vertices.push_back(normal.z);
 
-            vertices.push_back(normals[z][x][0]);
-            vertices.push_back(normals[z][x][1]);
-            vertices.push_back(normals[z][x][2]);
+            // 3. APUTIEDOT / TEKSTUURIKOORDINAATIT (Layout 2: 3 floatia)
+            // Hyödynnetään nämä paikat maaston UV-koordinaateille väliltä 0.0 - 1.0
+            vertices.push_back(static_cast<float>(x) / static_cast<float>(MAP_SIZE));
+            vertices.push_back(static_cast<float>(z) / static_cast<float>(MAP_SIZE));
+            vertices.push_back(0.0f); // Viimeinen tyhjäksi täytteeksi, jotta 9 floatia täyttyy
         }
     }
 
+    // 3. Vaihe: Indeksipuskurin luonti (pysyy samana)
     for (int z = 0; z < MAP_SIZE - 1; ++z) {
         for (int x = 0; x < MAP_SIZE - 1; ++x) {
-            unsigned int topLeft = z * MAP_SIZE + x;
-            unsigned int topRight = topLeft + 1;
-            unsigned int bottomLeft = (z + 1) * MAP_SIZE + x;
+            unsigned int topLeft     = z * MAP_SIZE + x;
+            unsigned int topRight    = topLeft + 1;
+            unsigned int bottomLeft  = (z + 1) * MAP_SIZE + x;
             unsigned int bottomRight = bottomLeft + 1;
 
             indices.push_back(topLeft);
             indices.push_back(bottomLeft);
             indices.push_back(topRight);
+
             indices.push_back(topRight);
             indices.push_back(bottomLeft);
             indices.push_back(bottomRight);
@@ -81,10 +74,26 @@ void Terrain::generate(std::vector<float>& vertices, std::vector<unsigned int>& 
     }
 }
 
-// Palauttaa maaston tarkan korkeuden mistä tahansa kohdasta (blineaarinen interpolointi)
+
+
+
+// Apufunktio barysentrisen korkeuden laskemiseen kolmion sisällä
+float barocentricInterpolation(float p1X, float p1Y, float p1Z, 
+                               float p2X, float p2Y, float p2Z, 
+                               float p3X, float p3Y, float p3Z, 
+                               float x, float z) {
+    float det = (p2Z - p3Z) * (p1X - p3X) + (p3X - p2X) * (p1Z - p3Z);
+    if (std::abs(det) < 1e-6f) return p1Y; // Estetään nollalla jakaminen
+
+    float l1 = ((p2Z - p3Z) * (x - p3X) + (p3X - p2X) * (z - p3Z)) / det;
+    float l2 = ((p3Z - p1Z) * (x - p3X) + (p1X - p3X) * (z - p3Z)) / det;
+    float l3 = 1.0f - l1 - l2;
+
+    return l1 * p1Y + l2 * p2Y + l3 * p3Y;
+}
 float Terrain::getHeightAt(float x, float z) {
     if (x < 0.0f || x >= MAP_SIZE - 1 || z < 0.0f || z >= MAP_SIZE - 1) {
-        return 0.0f; // Maaston ulkopuolella
+        return 0.0f; 
     }
 
     int gridX = static_cast<int>(std::floor(x));
@@ -93,14 +102,26 @@ float Terrain::getHeightAt(float x, float z) {
     float coordX = x - gridX;
     float coordZ = z - gridZ;
 
-    // Interpoloidaan korkeus neliön neljän kulman välillä
-    float h00 = heightMap[gridZ][gridX];
-    float h10 = heightMap[gridZ][gridX + 1];
-    float h01 = heightMap[gridZ + 1][gridX];
-    float h11 = heightMap[gridZ + 1][gridX + 1];
+    // VARMISTA TÄMÄ JÄRJESTYS: [gridZ] on ensimmäinen (rivi), [gridX] on toinen (sarake)
+    float h00 = heightMap[gridZ][gridX];         // Ylä-Vasen
+    float h10 = heightMap[gridZ][gridX + 1];     // Ylä-Oikea
+    float h01 = heightMap[gridZ + 1][gridX];     // Ala-Vasen
+    float h11 = heightMap[gridZ + 1][gridX + 1]; // Ala-Oikea
 
-    float txt0 = (1.0f - coordX) * h00 + coordX * h10;
-    float txt1 = (1.0f - coordX) * h01 + coordX * h11;
-
-    return (1.0f - coordZ) * txt0 + coordZ * txt1;
+    // Jos pelaaja putoaa yhä läpi diagonaalin kohdalla, vaihda ehto muotoon: (coordX >= coordZ)
+    if (coordX <= (1.0f - coordZ)) {
+        return barocentricInterpolation(
+            0.0f, h00, 0.0f,
+            0.0f, h01, 1.0f,
+            1.0f, h10, 0.0f,
+            coordX, coordZ
+        );
+    } else {
+        return barocentricInterpolation(
+            1.0f, h10, 0.0f,
+            0.0f, h01, 1.0f,
+            1.0f, h11, 1.0f,
+            coordX, coordZ
+        );
+    }
 }
