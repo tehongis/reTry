@@ -61,6 +61,7 @@ Start:
 	moveq.l	#0,d0
 	jsr		pt_Init
 
+    lea     CUSTOM,a6
 	move.w  #INT_CLR,INTENA(a6)
 	move.w  #DMA_MASTER+DMA_SPRITE+DMA_BITPLANE+DMA_COPPER+DMA_BLITTER+DMA_AUDIO,DMACON(a6)
 
@@ -387,6 +388,15 @@ OctantTable:
 	EVEN
 
 	SECTION Data,DATA_C
+
+BitmapA:        
+	dcb.b   40*256*2,0                
+	EVEN                        
+
+BitmapB:        
+	dcb.b   40*256*2,0                
+
+
 	EVEN
 
 CopperList:
@@ -395,6 +405,13 @@ CopperList:
 	dc.w    DIWSTOP,$2CC1           ; Ruudun lopetus
 	dc.w    DDFSTRT,$0038           ; Datafetch aloitus
 	dc.w    DDFSTOP,$00D0           ; Datafetch lopetus
+
+	dc.w    BPL1MOD,$0028
+	dc.w    BPL2MOD,$0028
+
+	dc.w    BPLCON2,$0000
+	dc.w    BPLCON1,$0000
+	dc.w    BPLCON0,$2200
 
 	dc.w    BPL1PTH
 Bpl1PtrHi:
@@ -410,11 +427,6 @@ Bpl2PtrHi:
 Bpl2PtrLo:
 	dc.w    0
 
-	dc.w    BPLCON0,$2200
-	dc.w    BPLCON1,$0000
-	dc.w    BPLCON2,$0000
-	dc.w    BPL1MOD,$0028
-	dc.w    BPL2MOD,$0028
 
 	; --- 3. RUUDUN SISÄPUOLEN VÄRIT ---
 	; Pakotetaan ruudun alue mustaksi ja viivat valkoisiksi
@@ -444,17 +456,6 @@ Bpl2PtrLo:
 ModuleData:
 	incbin "scoopex-slideshow.mod"
 	;incbin "testmod.p61"
-	EVEN
-
-	SECTION ScreenBuffers,BSS_C
-	EVEN
-
-BitmapA:        
-	dcb.b   40*256*2,$fe                
-	EVEN                        
-
-BitmapB:        
-	dcb.b   40*256*2,$63                
 	EVEN
 
 	END
