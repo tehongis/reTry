@@ -55,15 +55,13 @@ Start:
 	move.w  d0,OldINT
 	move.l  VEC_INT3,OldVector
 
+	move.w  #INT_CLR,INTENA(a6)
+	move.w  #DMA_MASTER+DMA_SPRITE+DMA_BITPLANE+DMA_COPPER+DMA_BLITTER+DMA_AUDIO,DMACON(a6)
+
     lea     CUSTOM,a6
 	lea		ModuleData,a0
 	moveq.l	#0,d0
-	jsr		pt_Init
-
-	move.w  #INT_CLR,INTENA(a6)
-	move.w  #INT_CLR,INTREQ(a6)
-	move.w  #DMA_MASTER+DMA_SPRITE+DMA_BITPLANE+DMA_COPPER+DMA_BLITTER+DMA_AUDIO,DMACON(a6)
-	move.l  #VBlank_IRQ,VEC_INT3
+	;jsr		pt_Init
 
 	move.l  #CopperList,d0
 	swap    d0                      
@@ -73,8 +71,11 @@ Start:
 	move.w  #0,COPJMP1(a6)
 
 	move.w  #DMA_SET+DMA_MASTER+DMA_BITPLANE+DMA_COPPER+DMA_BLITTER+DMA_AUDIO,DMACON(a6)
+
+	move.l  #VBlank_IRQ,VEC_INT3
 	move.w  #INT_SET+INT_MASTER+INT_VERTB,INTENA(a6)       ; Sallitaan vain VBlank-keskeytys
-	
+	move.w  #INT_CLR,INTREQ(a6)
+
 .WaitMouse
 	btst    #6,$BFE001
 	bne     .WaitMouse
@@ -156,7 +157,7 @@ VBlank_IRQ:
 	swap    d1
 	move.w  d1,Bpl2PtrHi            
 
-	jsr		pt_Music
+	;jsr		pt_Music
 
 	move.l	FrameCounter,d0
 	and.l	#$4ffe,d0
