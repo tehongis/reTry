@@ -1,0 +1,83 @@
+
+EXECBASE    EQU     4
+
+CUSTOM      EQU     $DFF000
+
+DIWSTRT     EQU     $08E
+DIWSTOP     EQU     $090
+DDFSTRT     EQU     $092
+DDFSTOP     EQU     $094
+BPLCON0     EQU     $100
+BPLCON1     EQU     $102
+BPLCON2     EQU     $104
+BPL1MOD     EQU     $108
+BPL2MOD     EQU     $10A
+BPL1PTH     EQU     $0E0
+BPL1PTL     EQU     $0E2
+BPL2PTH     EQU     $0E4
+BPL2PTL     EQU     $0E6  
+COP1LCH     EQU     $080
+COP1LCL     EQU     $082
+COPJMP1     EQU     $088
+INTENA      EQU     $09A
+INTREQ      EQU     $09C
+INTREQR     EQU     $01E  
+VHPOSR      EQU     $006
+DMACON      EQU     $096
+DMACONR     EQU     $002
+INTENAR     EQU     $01C
+COLOR00     EQU     $180
+COLOR01     EQU     $182
+COLOR02     EQU     $184
+COLOR03     EQU     $186
+
+DMACONR_BB  EQU     14
+
+BLTCON0     EQU     $040
+BLTCON1     EQU     $042
+BLTAFWM     EQU     $044
+BLTALWM     EQU     $046
+BLTAPT      EQU     $050
+BLTCPTH     EQU     $048
+BLTDPTH     EQU     $054
+BLTSIZE     EQU     $058
+BLTCMOD     EQU     $060
+BLTBMOD     EQU     $062
+BLTAMOD     EQU     $064
+BLTDMOD     EQU     $066
+BLTBDAT     EQU     $072
+BLTADAT     EQU     $074
+
+SIGN_BIT    EQU     $0040
+
+
+DMA_SET      EQU    $8000
+DMA_MASTER   EQU    $0200
+DMA_SPRITE   EQU    $0100
+DMA_BITPLANE EQU    $0080
+DMA_COPPER   EQU    $0040
+DMA_BLITTER  EQU    $0010
+DMA_AUDIO    EQU    $000F
+
+INT_SET      EQU    $8000
+INT_MASTER   EQU    $4000
+INT_EXTERNAL EQU    $2000
+INT_BLITTER  EQU    $0040
+INT_COPER    EQU    $0010
+INT_VERTB    EQU    $0020
+INT_AUDIO    EQU    $000F  ; Sisältää kaikki 4 audiokanavaa (bitit 0-3)
+
+INT_CLR      EQU    $7FFF
+
+_LVOForbid  EQU     -$84
+_LVODisable EQU     -$78
+_LVOEnable  EQU     -$7E
+_LVOPermit  EQU     -$8A
+_LVOOpenLibrary EQU -$198
+_LVOCloseLibrary EQU -$1A2
+VEC_INT3    EQU     $6C
+
+_LVOLoadView    EQU -$DE
+_LVOWaitTOF     EQU -$10E
+gb_ActiView     EQU 34
+gb_copinit      EQU 38

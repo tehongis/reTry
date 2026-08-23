@@ -44,7 +44,6 @@ pt_PattDelTime2 = -6
 pt_PatternPos = -4
 pt_DMACONTemp = -2
 
-
 ;	A little (not very good!) example code to
 ;  	play a module
 ;
@@ -66,11 +65,8 @@ pt_DMACONTemp = -2
 ;	rts
 
 
-
-
 pt_Init:
 	lea			Variables,a5
-	lea			$dff000,a6
 	move.l	a0,pt_SongDataPtr(a5)
 	lea			952(a0),a1
 	moveq		#127,D0
