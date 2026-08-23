@@ -63,6 +63,7 @@ Start:
 VBlank_IRQ:
 	movem.l d0-d7/a0-a6,-(sp)    ; Tallenna kaikki rekisterit pinoon turvaan
 
+
 ;	jsr		pt_Music
 
 	move.l	FrameCounter,d0
@@ -343,15 +344,16 @@ BitmapB:
 
 CopperList:
 	; --- 2. RUUDUN KOOT JA REKISTERIT ---
+	dc.w    BPLCON0,$3200
+	dc.w    BPLCON1,$0000
+	dc.w    BPLCON2,$0000
+
 	dc.w    DIWSTRT,$2C81,DIWSTOP,$2CC1
 	dc.w    DDFSTRT,$0038,DDFSTOP,$00D0
 
 	dc.w    BPL1MOD,$0028
 	dc.w    BPL2MOD,$0028
 
-	dc.w    BPLCON2,$0000
-	dc.w    BPLCON1,$0000
-	dc.w    BPLCON0,$2200
 
 	dc.w    BPL1PTH
 Bpl1PtrHi:
@@ -394,7 +396,7 @@ Bpl2PtrLo:
 	dc.w    $FFFF,$FFFE
 
 ModuleData:
-	incbin "scoopex-slideshow.mod"
+	;incbin "scoopex-slideshow.mod"
 	;incbin "testmod.p61"
 	EVEN
 
