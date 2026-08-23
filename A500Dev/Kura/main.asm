@@ -16,50 +16,25 @@ Start:
 
 	move.l	a0,d0
 	move.w  d0,Bpl1PtrLo            
-	swap    d0
+	swap.w   d0
 	move.w  d0,Bpl1PtrHi            
 
-	move.l	a0,d1                   
-	add.l	#40,d1
-	move.w  d1,Bpl2PtrLo            
-	swap    d1
-	move.w  d1,Bpl2PtrHi  
-
-	move.l  EXECBASE,a6
-	lea     GfxName(pc),a1
-	moveq   #0,d0               
-	jsr     _LVOOpenLibrary(a6)
-	move.l  d0,GfxBase
-	beq     NoGfxLibrary
-
-	move.l  GfxBase,a1
-	move.l  gb_ActiView(a1),OldView 
-
-	move.l  EXECBASE,a6
-	jsr     _LVOForbid(a6)
-
-	move.l  GfxBase,a6
-	suba.l  a1,a1               
-	jsr     _LVOLoadView(a6)
-	jsr     _LVOWaitTOF(a6)     
-	jsr     _LVOWaitTOF(a6)     
-
-	move.l  EXECBASE,a6
-	jsr     _LVODisable(a6)
-
-	lea     CUSTOM,a6
-	move.w  DMACONR(a6),d0
-	or.w    #$8000,d0
-	move.w  d0,OldDMA
-	move.w  INTENAR(a6),d0
-	or.w    #$8000,d0
-	move.w  d0,OldINT
-	move.l  VEC_INT3,OldVector
+	move.l	a0,d0                   
+	add.l	#40,d0
+	move.w  d0,Bpl2PtrLo            
+	swap.w    d0
+	move.w  d0,Bpl2PtrHi  
 
     lea     CUSTOM,a6
 	lea		ModuleData,a0
 	moveq.l	#0,d0
-	jsr		pt_Init
+;	jsr		pt_Init
+
+	move.l  EXECBASE,a6
+	jsr     _LVOForbid(a6)
+
+	move.l  EXECBASE,a6
+	jsr     _LVODisable(a6)
 
     lea     CUSTOM,a6
 	move.w  #INT_CLR,INTENA(a6)
@@ -74,62 +49,44 @@ Start:
 
 	move.w  #DMA_SET+DMA_MASTER+DMA_BITPLANE+DMA_COPPER+DMA_BLITTER+DMA_AUDIO,DMACON(a6)
 
+	move.w  #INT_CLR,INTREQ(a6)
 	move.l  #VBlank_IRQ,VEC_INT3
 	move.w  #INT_SET+INT_MASTER+INT_VERTB,INTENA(a6)       ; Sallitaan vain VBlank-keskeytys
-	move.w  #INT_CLR,INTREQ(a6)
 
-.WaitMouse
-	btst    #6,$BFE001
-	bne     .WaitMouse
-
-ExitGently:
-	lea     CUSTOM,a6
-	
-	move.w  #$7FFF,INTENA(a6)
-	move.w  #$7FFF,INTREQ(a6)
-	move.w  #$7FFF,DMACON(a6)
-	
-	move.l  OldVector,VEC_INT3
-
-	move.l  GfxBase,a0
-	move.l  gb_copinit(a0),a1       
-	move.l  a1,COP1LCH(a6)
-	move.w  #0,COPJMP1(a6)
-
-    lea     CUSTOM,a6
-	move.w  OldDMA,DMACON(a6)
-	move.w  OldINT,INTENA(a6)
-
-	lea     CUSTOM,a6
-	jsr		pt_End
-
-	move.l  GfxBase,a6
-	move.l  OldView,a1              
-	jsr     _LVOLoadView(a6)
-	jsr     _LVOWaitTOF(a6)         
-	jsr     _LVOWaitTOF(a6)
-
-	move.l  EXECBASE,a6
-	jsr     _LVOEnable(a6)
-	jsr     _LVOPermit(a6)
-
-	move.l  EXECBASE,a6
-	move.l  GfxBase,a1
-	jsr     _LVOCloseLibrary(a6)
-
-NoGfxLibrary:
-
-	moveq.l   #0,d0
-	rts
+.Wait4Ever
+	bne     .Wait4Ever
 
 ; =============================================================================
 ; ---- VBlank IRQ
 ; =============================================================================
 
-
 VBlank_IRQ:
 	movem.l d0-d7/a0-a6,-(sp)    ; Tallenna kaikki rekisterit pinoon turvaan
 
+;	jsr		pt_Music
+
+	move.l	FrameCounter,d0
+	and.w	#$4ffe,d0
+	move.l  BackBuffer,a0
+	eor.w   #-1,(a0,d0.w)
+
+
+	eor.w	#-1,d0
+	and.w	#$4ffe,d0
+	move.l  FrontBuffer,a0
+	eor.w   #-1,(a0,d0.w)
+
+	addq.l  #1,FrameCounter         
+
+	lea     CUSTOM,a0
+	move.w  #INT_VERTB,INTREQ(a0)
+	move.w  #INT_VERTB,INTREQ(a0)
+
+	movem.l (sp)+,d0-d7/a0-a6    ; Palautetaan kaikki rekisterit pinosta puhtaasti
+	rte                          ; Palataan keskeytyksestä takaisin
+
+
+SwapBuffers:
 	lea		BitmapA,a1
 	move.l	FrontBuffer,d1
 	cmp.l 	a1,d1
@@ -153,28 +110,13 @@ VBlank_IRQ:
 	move.l	d0,d1                   
 	add.l   #40,d1                  
 	move.w  d0,Bpl1PtrLo            
-	swap    d0
+	swap.w  d0
 	move.w  d0,Bpl1PtrHi            
 	move.w  d1,Bpl2PtrLo            
-	swap    d1
+	swap.w  d1
 	move.w  d1,Bpl2PtrHi            
 
-	jsr		pt_Music
-
-	move.l	FrameCounter,d0
-	and.l	#$4ffe,d0
-	move.l  BackBuffer,a0
-	eor.w   #-1,(a0,d0)
-
-	addq.l  #1,FrameCounter         
-
-	lea     CUSTOM,a0
-	move.w  #INT_VERTB,INTREQ(a0)
-	move.w  #INT_VERTB,INTREQ(a0)
-
-	movem.l (sp)+,d0-d7/a0-a6    ; Palautetaan kaikki rekisterit pinosta puhtaasti
-	rte                          ; Palataan keskeytyksestä takaisin
-
+	rts
 
 ; =============================================================================
 ; ---- Blitter
@@ -401,10 +343,8 @@ BitmapB:
 
 CopperList:
 	; --- 2. RUUDUN KOOT JA REKISTERIT ---
-	dc.w    DIWSTRT,$2C81           ; Ruudun aloitus (Standardi 320x256)
-	dc.w    DIWSTOP,$2CC1           ; Ruudun lopetus
-	dc.w    DDFSTRT,$0038           ; Datafetch aloitus
-	dc.w    DDFSTOP,$00D0           ; Datafetch lopetus
+	dc.w    DIWSTRT,$2C81,DIWSTOP,$2CC1
+	dc.w    DDFSTRT,$0038,DDFSTOP,$00D0
 
 	dc.w    BPL1MOD,$0028
 	dc.w    BPL2MOD,$0028
