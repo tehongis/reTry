@@ -9,10 +9,11 @@
 
 Start:
 
-	lea		FrontBuffer,a0
-	lea		BackBuffer,a1
+	lea		BitmapA,a0
 	move.l  a0,FrontBuffer     
-	move.l  a1,BackBuffer
+	lea		BitmapB,a1
+	move.l  a1,BackBuffer     
+
 	move.l	a0,d0
 	move.w  d0,Bpl1PtrLo            
 	swap    d0
@@ -55,13 +56,13 @@ Start:
 	move.w  d0,OldINT
 	move.l  VEC_INT3,OldVector
 
-	move.w  #INT_CLR,INTENA(a6)
-	move.w  #DMA_MASTER+DMA_SPRITE+DMA_BITPLANE+DMA_COPPER+DMA_BLITTER+DMA_AUDIO,DMACON(a6)
-
     lea     CUSTOM,a6
 	lea		ModuleData,a0
 	moveq.l	#0,d0
-	;jsr		pt_Init
+	jsr		pt_Init
+
+	move.w  #INT_CLR,INTENA(a6)
+	move.w  #DMA_MASTER+DMA_SPRITE+DMA_BITPLANE+DMA_COPPER+DMA_BLITTER+DMA_AUDIO,DMACON(a6)
 
 	move.l  #CopperList,d0
 	swap    d0                      
@@ -143,7 +144,7 @@ VBlank_IRQ:
 	move.l  a1,FrontBuffer
 	lea		BitmapA,a1
 	move.l  a1,BackBuffer
-.joinks:
+.joinks:       
 
 
 ; ---- Update copperlist
@@ -157,7 +158,7 @@ VBlank_IRQ:
 	swap    d1
 	move.w  d1,Bpl2PtrHi            
 
-	;jsr		pt_Music
+	jsr		pt_Music
 
 	move.l	FrameCounter,d0
 	and.l	#$4ffe,d0
