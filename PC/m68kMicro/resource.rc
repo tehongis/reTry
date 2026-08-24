@@ -1,0 +1,31 @@
+#include <windows.h>
+
+// Järjestelmän versiotiedot (Version Info Resource)
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     3,0,0,0
+PRODUCTVERSION  3,0,0,0
+FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+FILEFLAGS       VS_FF_DEBUG
+FILEOS          VOS_NT_WINDOWS32
+FILETYPE        VFT_APP
+FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0" // U.S. English / Unicode
+        BEGIN
+            VALUE "CompanyName",      "Rocket68 Team\0"
+            VALUE "FileDescription",  "Rocket68 M68k Hardware Emulator\0"
+            VALUE "FileVersion",      "3.0.0.0\0"
+            VALUE "InternalName",     "rocket68_emu\0"
+            VALUE "LegalCopyright",   "Copyright (C) 2026\0"
+            VALUE "OriginalFilename", "rocket68_emu.exe\0"
+            VALUE "ProductName",      "Rocket68 Emulator\0"
+            VALUE "ProductVersion",   "3.0.0.0\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

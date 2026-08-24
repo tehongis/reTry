@@ -1,0 +1,106 @@
+# Rocket68 System Reference Manual & Architecture
+
+Tämä dokumentti määrittelee **Rocket68**-tietokoneen emulaattoritason muistikartan, laitteistorekisterit (I/O), keskeytysprioriteetit (IRQ) sekä matalan tason **BIOS API Jump Library** -rajapinnan.
+
+---
+
+## 1. Laitteistorekisterit (I/O Memory Map)
+
+Järjestelmän laitteisto-ohjaimet on sijoitettu I/O-avaruuden loppuun (alue `$001FFF00` – `$001FFFFF`).
+
+| Osoite | Koko | Rekisterin nimi | Kuvaus / Toiminta |
+| :--- | :--- | :--- | :--- |
+| `$001FFF00` | Long | `HDD_LBA` | Virtuaalisen kiintolevyn (`hdd.img`) lohkon numero. |
+| `$001FFF04` | Long | `HDD_BUFFER` | Virtuaali-DMA-siirron kohde/lähdeosoite RAM-muistissa. |
+| `$001FFF08` | Byte | `HDD_CMD` | Levykomento: `1` = Lue lohko muistiin, `2` = Kirjoita lohko levylle. |
+| `$001FFF09` | Byte | `HDD_STATUS` | Levyn tila: `0` = Valmis/OK, `1` = Varattu (Busy), `2` = Virhe. |
+| `$001FFFFB` | Byte | `VBLANK` | Ruudunpäivityksen ilmaisin (`1` = uusi pystytaajuusruutu alkanut). |
+| `$001FFFFC` | Word | `BEEP_REG` | Äänilaite. Kirjoitus laukaisee asynkronisen Windows-äänen taajuuden mukaan (esim. >800Hz Info, <300Hz Virhe). |
+| `$001FFFFF` | Byte | `KEYBOARD` | Näppäimistön raaka Scancode (bitti b7: `0` = Painettu/Make, `1` = Vapautettu/Break). |
+
+---
+
+## 2. Muistikartta (System Memory Map)
+
+Järjestelmässä on käytössä yhteensä 4 MB keskusmuistia (`TOTAL_MEM_SIZE`).
+
+* **`$00000000 – $000003FF`**: M68k Vektoritaulukko (Pinot, PC ja keskeytysvektorit)
+* **`$00000400 – $000007FF`**: Vapaa / Järjestelmän sisäinen varaus
+* **`$00000800 – $000008FF`**: **BIOS API Jump Library (Hyppytaulukko)**
+* **`$00001000 – $00003FFF`**: BIOS- / Kernel-koodi ja sisäiset alirutiinit
+* **`$00004000 – $00004FFF`**: BIOSin globaalit RAM-muuttujat ja keskeytyskoukut
+* **`$00005000 – $000051FF`**: `loader.exe` (Kiintolevyn LBA 0 boottilohkon latauspaikka)
+* **`$00006000 – ...`**: Käyttäjän sovellukset (esim. `monitor.asm` tai `basic.asm`)
+* **`$00200000 – $00213FFF`**: Framebuffer VRAM (Grafiikkanäyttö 320x256 pikseliä, 8-bit per pikseli)
+* **`$00214000 – $002143FF`**: Palettimuisti (256 * RGBQUAD-värit)
+* **`$00220000 – $002207FF`**: `FONT.ROM` (Matalan tason Toshiba-merkkigeneraattori RAMissa)
+
+---
+
+## 3. Autovektorikeskeytykset (Interrupt Levels)
+
+Keskeytykset on järjestetty siten, että kriittisimmät reaaliaikaiset ajastimet voivat keskeyttää hitaammat levy- ja näyttöoperaatiot.
+
+| Taso (IRQ) | Vektoriosoite | Käsittelijä BIOSissa | Kuvaus |
+| :---: | :--- | :--- | :--- |
+| **Level 1** | `$00000064` | `INT_HDD` | **Virtuaali-DMA HDD:** Laukeaa, kun 512 tavun lohko on siirretty. |
+| **Level 2** | `$00000068` | `INT_KEYBOARD` | **Näppäimistö:** Laukeaa uuden näppäimen painalluksesta. |
+| **Level 3** | `$0000006C` | `INT_VBLANK` | **VBLANK:** Laukeaa 60 kertaa sekunnissa näytön tahdissa. |
+| **Level 4** | `$00000070` | `INT_TIMER` | **Järjestelmäajastin:** Itsenäinen kello (esim. 100 Hz järjestelmäticks). |
+
+---
+
+## 4. BIOS API Jump Library (Kutsuosoitteet)
+
+Kaikki ulkoiset ohjelmat (kuten lataaja ja komentotulkki) kommunikoivat laitteiston kanssa **ainoastaan** näiden kiinteiden osoitteiden kautta. Jokainen hyppy vie tasan 6 tavua.
+
+```assembly
+B_PRINT_CHAR    EQU   \$00000800   ; Tulostaa merkin ruudulle
+                                  ; Sisään: d0.b = ASCII, d1.b = X (0-39), d2.b = Y (0-31)
+
+B_CLEAR_SCREEN  EQU   \$00000806   ; Tyhjentää koko näytön mustaksi (Väri 0)
+                                  ; Sisään: -
+
+B_SCROLL_UP     EQU   \$0000080C   ; Skrollaa näyttöä yhden tekstirivin (8 pikseliä) ylöspäin
+                                  ; Sisään: -
+
+B_SCROLL_DOWN   EQU   \$00000812   ; Skrollaa näyttöä yhden tekstirivin (8 pikseliä) alaspäin
+                                  ; Sisään: -
+
+B_HDD_READ      EQU   \$00000818   ; Lukee 512 tavun lohkon kiintolevyltä (Keskeytyspohjainen DMA)
+                                  ; Sisään: d0.l = LBA lohkonumero, a0.l = Kohdeosoite RAMissa
+                                  ; Ulos:  d0.b = Palautusstatus (0 = OK, 2 = Virhe)
+
+B_HDD_WRITE     EQU   \$0000081E   ; Kirjoittaa 512 tavun lohkon kiintolevylle (Keskeytyspohjainen DMA)
+                                  ; Sisään: d0.l = LBA lohkonumero, a0.l = Lähdeosoite RAMissa
+                                  ; Ulos:  d0.b = Palautusstatus (0 = OK, 2 = Virhe)
+
+B_PRINT_STR     EQU   \$00000824   ; Tulostaa nollaan (\0) päättyvän merkkijonon automaattisella
+                                  ; kursorin ja rivinvaihtojen (\n = 10) hallinnalla.
+                                  ; Sisään: a4.l = Merkkijonon aloitusosoite
+```
+
+---
+
+## 5. Globaalit RAM-muuttujat & Sovelluskoukut (`$00004000`)
+
+Sovellukset voivat lukea järjestelmän tilaa suoraan muuttujista tai "kaapata" laitteistokeskeytykset itselleen kirjoittamalla oman rutiininsa osoitteen vastaavaan `USER_` -osoitteeseen.
+
+* **`USER_VBLANK`** (`$00004000`, Long): Osoitin sovelluksen omaan VBLANK-käsittelijään.
+* **`USER_KBD`**    (`$00004004`, Long): Osoitin sovelluksen omaan näppäimistökäsittelijään.
+* **`USER_HDD`**    (`$00004008`, Long): Osoitin sovelluksen omaan kiintolevykäsittelijään.
+* **`USER_TIMER`**  (`$0000400C`, Long): Osoitin sovelluksen omaan ajastinkäsittelijään.
+* **`SYS_TICKS`**   (`$00004010`, Long): Järjestelmän uptime-kello. Kasvaa automaattisesti jokaisesta Timer-keskeytyksestä.
+* **`BIOS_KBD_NEW`** (`$00004014`, Byte): Lippu, jonka arvo on `1`, jos uusi merkki odottaa puskurissa.
+* **`BIOS_KBD_CHAR`** (`$00004015`, Byte): Viimeisin näppäimistöltä luettu ASCII-merkki (luettu kääntötaulukon läpi).
+* **`BOOT_SECTOR_BUF`** (`$00004018`, 512 tavua): BIOSin käyttämä väliaikainen puskuri boottilohkolle.
+
+---
+
+## 6. Autoboot-allekirjoitus (Boot Signature)
+
+Jotta kiintolevy (`hdd.img`) tunnistetaan käynnistyskelpoiseksi, sen lohkon 0 (tavut 510–511) pitää sisältää maaginen tavupari:
+* Tavu 510: **`$4F`** (ASCII 'O')
+* Tavu 511: **`$53`** (ASCII 'S')
+
+Jos allekirjoitus löytyy, BIOS kopioi lohkon sisällön muistiin osoitteeseen `$00005000` ja siirtää suorituksen sinne käskyllä `jmp $00005000`.
