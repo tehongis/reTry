@@ -24,7 +24,7 @@ REAL_LBOOT_START:
             lea     DIR_BUF_RAM,a0      ; Puskuri RAMissa (Kaukana koodista)
             jsr     (B_HDD_READ)
             tst.b   d0                  ; 0 = OK
-            bne     BOOT_ERROR
+            bne     SYSTEM_HALT
 
             ; 2. Etsitään tiedosto "MONITOR.SYS" hakemistosta
             lea     DIR_BUF_RAM,a0      
@@ -49,10 +49,8 @@ next_entry:
             ; Jos tiedostoa ei löydy
             lea     MSG_NOT_FOUND(pc),a4
             jsr     (B_PRINT_STR)
-            illegal
+            bne     SYSTEM_HALT
 
-BOOT_ERROR:
-            illegal                     
 
 LOAD_TARGET_FILE:
             move.l  12(a0),d2           ; d2 = Aloitus-LBA levyltä
@@ -72,12 +70,16 @@ LOAD_SECTORS_LOOP:
             movea.l a2,a0               
             jsr     (B_HDD_READ)
             tst.b   d0
-            bne     BOOT_ERROR
+            bne     SYSTEM_HALT
 
             addq.l  #1,d2               
             adda.l  #512,a2             
             subq.l  #1,d3               
             bra     LOAD_SECTORS_LOOP
+
+SYSTEM_HALT:
+            stop    #$2700              ; Aito rautahalt
+            bra.s   SYSTEM_HALT
 
 LAUNCH_SYSTEM:
             jmp     $00006000           ; Käynnistetään Monitori!
@@ -89,10 +91,9 @@ MSG_LOAD_DIR:    dc.b "Reading volume directory...",10,0
 MSG_LOADING_SYS: dc.b "Loading Monitor.sys via index DMA...",10,0
 MSG_NOT_FOUND:   dc.b "Fatal: Monitor.sys not found!",10,0
 
-* --- PAKOTETAAN TÄSMÄLLEEN 512 TAVUN KOKO JA SIGNATURE ---
+* --- PAKOTETAAN 512 TAVUN KOKO JA SIGNATURE ---
             org     $00005000+510
-            dc.b    $4F                 ; 'O'
-            dc.b    $53                 ; 'S'
+            dc.b    $4F,$53             ; 'OS'
 
-* --- MÄÄRITELLEEN REAALIAIKAINEN PUSKURI KAUKANA KERNELISSÄ ---
-DIR_BUF_RAM     EQU     $00004500           ; Käytetään BIOSin RAM-aluetta puskurille
+* --- PUSKURI ---
+DIR_BUF_RAM     EQU     $00004500
