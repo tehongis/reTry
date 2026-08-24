@@ -118,14 +118,21 @@ BOOT_ERROR_IO:
             lea     MSG_ERR_IO,a4
             bsr     BIOS_PRINT_STR
             move.w  #1000,(BEEP_REG)    ; Korkea vikapiip
-            stop    #$2700
+
+            jmp     SYSTEM_HALT
 
 BOOT_ERROR_MAGIC:
             lea     MSG_ERR_SIG,a4
             bsr     BIOS_PRINT_STR
             move.w  #200,(BEEP_REG)     ; Matala virhepiip
+
+            jmp     SYSTEM_HALT
+
+* --- GLOBAALI HYPPYPAIKKA MUILLE OHJELMILLE ---
+SYSTEM_HALT:
             stop    #$2700
-            bra     BOOT_ERROR_MAGIC    ; Varmistus
+            bra     *                   ; Pomminvarma suojasilmukka
+
 * =============================================================================
 * BIOS MERKKIJONOTULOSTIN (Apufunktio lokeille)
 * =============================================================================

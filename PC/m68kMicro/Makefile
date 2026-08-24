@@ -1,5 +1,5 @@
 # =============================================================================
-# Rocket68 Toolchain Makefile (NMAKE / Windows Version) - RIISUTTU SUOJAUSKIERTO
+# Rocket68 Toolchain Makefile (NMAKE / Windows Version) - WITH AUTOSIGN
 # =============================================================================
 
 # --- Työkalut ja Kääntäjät ---
@@ -28,16 +28,31 @@ HDD_IMG  = hdd.img
 # PÄÄKOHTEET (Targets)
 # =============================================================================
 
-all: setup $(EMU_EXE) $(BIOS_BIN) $(LOADER) $(MONITOR) $(HDD_IMG)
+# All-kohteeseen on lisätty 'sign' heti emulaattorin kääntämisen jälkeen
+all: setup $(EMU_EXE) sign $(BIOS_BIN) $(LOADER) $(MONITOR) $(HDD_IMG)
 
 # Luodaan molemmat kansiot jos niitä ei ole olemassa
 setup:
 	@if not exist $(BIN_DIR) mkdir $(BIN_DIR)
 	@if not exist $(OS_BIN_DIR) mkdir $(OS_BIN_DIR)
 
-# 1. Käännetään C-emulaattori puhtaana ilman Windows-resursseja (.res)
+# 1. Käännetään C-emulaattori
 $(EMU_EXE): main.c
 	$(CC) $(CFLAGS) main.c $(LIB_DIR)\librocket68.lib /Fe$@ /link user32.lib kernel32.lib gdi32.lib /DEBUG /MANIFEST
+
+# --- Allekirjoitetaan emulaattori lokaalilla tiedostovarmenteella ---
+sign: $(EMU_EXE)
+	@echo [SIGN] Allekirjoitetaan emulaattori tiedostovarmenteella (rocket68.pfx)...
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "\
+		if (-not (Test-Path 'rocket68.pfx')) {\
+			Write-Error '[SIGN] FATAL ERROR: rocket68.pfx puuttuu! Aja vaiheen 1 komento luodaksesi tiedoston.';\
+			exit 1;\
+		}\
+		$$pwd = ConvertTo-SecureString -String 'Rocket123' -Force -AsPlainText;\
+		$$cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('rocket68.pfx', $$pwd);\
+		Set-AuthenticodeSignature -FilePath '$(EMU_EXE)' -Certificate $$cert | Out-Null;\
+		echo '[SIGN] Digitaalinen allekirjoitus valmis!'\
+	"
 
 $(BIOS_BIN): bios.asm
 	$(ASM68K) -Fbin -o $@ bios.asm

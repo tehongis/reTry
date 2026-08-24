@@ -55,6 +55,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                           &g_mem[ADDR_FB_START], pbmi, DIB_RGB_COLORS, SRCCOPY);
 
             EndPaint(hwnd, &ps);
+            m68k_set_irq(&g_cpu, 3);
             return 0;
         }
 
@@ -84,22 +85,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 // Julistetaan disassembler, jos se ei tule suoraan rocket68.h kautta
 int m68k_disasm(M68kCpu* cpu, u32 pc, char* buffer, int buf_size);
 
+// KORJATTU: Ei oteta parametreja, luetaan PC suoraan sisällä
 void dump_cpu_crash_state(void) {
-    char disasm_buffer[64] = {0};
-    
-    printf("\n==================================================================\n");
-    printf("[CPU CRASH DETECTED] Jarjestelma kaatui / suoritti laittoman operaation!\n");
-    printf("==================================================================\n");
-    
-    // Luetaan kaatunut PC-osoite (tämä funktio on olemassa ja toimii)
+    char disasm_buffer[64] = { 0 };
+    printf("\n[CPU CRASH] Jarjestelma kaatui!\n");
     u32 crash_pc = m68k_get_pc(&g_cpu);
-    printf("PC (Program Counter): 0x%08X\n", crash_pc);
-    
-    // Käytetään Rocket 68:n omaa disassembleria näyttämään mikä käsky petti!
+    printf("PC: 0x%08X\n", crash_pc);
     m68k_disasm(&g_cpu, crash_pc, disasm_buffer, sizeof(disasm_buffer));
-    printf("Kasky kohdassa PC:    %s\n", disasm_buffer);
-    
-    printf("==================================================================\n");
+    printf("Kasky: %s\n", disasm_buffer);
 }
 
 int illegal_instruction_callback(int opcode) {
@@ -125,6 +118,7 @@ int load_rom_file(const char* filename, u32 dest_addr, u32 max_size) {
 int main(void) {
 
     int timer_counter = 0;
+    int has_booted = 0;      // KORJAUS: Lisätty puuttuva boottilaskuri tähän!
 
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("==================================================================\n");
@@ -195,7 +189,18 @@ int main(void) {
             DispatchMessage(&msg);
         }
 
+        u32 last_pc = m68k_get_pc(&g_cpu);
         m68k_execute(&g_cpu, 128000);
+        u32 current_pc = m68k_get_pc(&g_cpu);
+
+        // --- KORJATTU TURVALLINEN CPU STOP -KAATUMISVAHTI ---
+        if (has_booted && (current_pc == last_pc)) {
+            printf("\n[EMU HALT] CPU pysaytetty (STOP/HALT-kasky)!\n");
+            dump_cpu_crash_state();
+            running = FALSE;
+        }
+
+        m68k_set_irq(&g_cpu, 0);
 
         // Vahtitaan PC-arvoa turvallisesti sallitun 4MB RAM-muistin rajoissa
         if (m68k_get_pc(&g_cpu) >= TOTAL_MEM_SIZE) {
@@ -212,7 +217,6 @@ int main(void) {
             timer_counter = 0;
         }
 
-        m68k_set_irq(&g_cpu, 3); // VBLANK (Level 3) pysyy ennallaan
 
     // main.c - Pääsilmukan sisällä (while running)
     u8 hdd_cmd = g_mem[ADDR_HDD_CMD];
