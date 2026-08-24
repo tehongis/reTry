@@ -16,12 +16,13 @@
 #define ADDR_PALETTE_START (ADDR_FB_START + FB_SIZE) 
 #define ADDR_FONT_ROM     0x00220000  
 
-#define ADDR_HDD_PAGE      0x001FFF00
-#define ADDR_HDD_WINDOW    0x001F0000 
-#define HDD_TOTAL_SIZE     (10 * 1024 * 1024) 
-#define ADDR_HDD_CMD       0x001FFF08 // Lisätty puuttuva määrittely [0x1.1]
-#define ADDR_HDD_STATUS    0x001FFF09
-#define ADDR_INT_CLEAR     0x001FFF0C
+#define ADDR_HDD_PAGE         0x001FFF00
+#define ADDR_HDD_WINDOW       0x001F0000
+#define HDD_TOTAL_SIZE        (10 * 1024 * 1024)
+#define ADDR_HDD_CMD          0x001FFF08
+#define ADDR_HDD_STATUS       0x001FFF09
+#define ADDR_INT_CLEAR        0x001FFF0C
+
 
 u8* g_hdd_mem = NULL; // Globaali puskuri koko kiintolevyn sisällölle
 u32 last_mapped_page = 0xFFFFFFFF; // Seuraa, milloin sivu muuttuu
@@ -101,7 +102,7 @@ int m68k_disasm(M68kCpu* cpu, u32 pc, char* buffer, int buf_size);
 // KORJATTU: Ei oteta parametreja, luetaan PC suoraan sisällä
 void dump_cpu_crash_state(void) {
     char disasm_buffer[64] = { 0 };
-    printf("\n[CPU CRASH] Jarjestelma kaatui!\n");
+    printf("\n[CPU STATE ON EXIT]\n");
     u32 crash_pc = m68k_get_pc(&g_cpu);
     printf("PC: 0x%08X\n", crash_pc);
     m68k_disasm(&g_cpu, crash_pc, disasm_buffer, sizeof(disasm_buffer));
@@ -115,41 +116,59 @@ int illegal_instruction_callback(int opcode) {
     return 0; 
 }
 
-// --- TAVUKORJATTU LEVYOHJAIN (main.c) ---
 void handle_hdd_io(void) {
-    // Luetaan 16-bittinen sana (Big-Endian) suoraan muistitaulukosta
+    // 1. Luetaan 16-bittinen komentorekisteri (Big-Endian Word) muistiavaruudesta
     u16 hdd_cmd = (g_mem[ADDR_HDD_CMD] << 8) | g_mem[ADDR_HDD_CMD + 1];
-    if (hdd_cmd == 0) return;
+    if (hdd_cmd == 0) return; // Jos komentoa ei ole, poistutaan heti
 
-    // Luetaan 32-bittinen sivu (Long) Big-Endian-muodossa
+    // Luetaan 32-bittinen kohdesivun LBA-lohko (Big-Endian Long)
     u32 current_page = (g_mem[ADDR_HDD_PAGE] << 24) | (g_mem[ADDR_HDD_PAGE + 1] << 16) | 
                        (g_mem[ADDR_HDD_PAGE + 2] << 8)  | g_mem[ADDR_HDD_PAGE + 3];
+    
+    // Lasketaan tavusiirtymä (offset) 10 MB virtuaalilevyltä (512 tavua per sektori)
     u32 hdd_offset = current_page * 512;
 
     if (hdd_offset + 512 <= HDD_TOTAL_SIZE) {
-        if (hdd_cmd == 1) { // LUKU
+        if (hdd_cmd == 1) { 
+            // --- KOMENTO 1: LUKU (READ) ---
+            // UUSI DEBUG-TULOSTE: Kerrotaan mitä lohkoa ollaan lataamassa
+            printf("[EMU HDD-RAUTA] >>> LUE PYYNTÖ: Sektori LBA %u | RAM-Ikkuna: 0x%08X\n", current_page, ADDR_HDD_WINDOW);
+            
             memcpy(&g_mem[ADDR_HDD_WINDOW], &g_hdd_mem[hdd_offset], 512);
         } 
-        else if (hdd_cmd == 2) { // TALLENNUS
+        else if (hdd_cmd == 2) { 
+            // --- KOMENTO 2: TALLENNUS (WRITE) ---
+            // UUSI DEBUG-TULOSTE: Kerrotaan mitä lohkoa ollaan tallentamassa
+            printf("[EMU HDD-RAUTA] <<< KIRJOITA PYYNTÖ: Sektori LBA %u | RAM-Ikkuna: 0x%08X\n", current_page, ADDR_HDD_WINDOW);
+            
             memcpy(&g_hdd_mem[hdd_offset], &g_mem[ADDR_HDD_WINDOW], 512);
+            
             if (g_hdd_file) {
                 fseek(g_hdd_file, hdd_offset, SEEK_SET);
                 fwrite(&g_hdd_mem[hdd_offset], 1, 512, g_hdd_file);
                 fflush(g_hdd_file);
             }
         }
-        // Kuitataan komento
+
+        // Pyyhitään komento molemmista tavuista, jotta laite ei jää jumiin [0x01.12]
         g_mem[ADDR_HDD_CMD] = 0;
         g_mem[ADDR_HDD_CMD + 1] = 0;
+
+        // Nostetaan LEVEL 1 laitteistokeskeytys (INT 1) suorittimelle
         m68k_set_irq(&g_cpu, 1); 
+    } else {
+        printf("[EMU HDD-RAUTA] VIRHE: Viallinen LBA %u (Offset 0x%08X ylittää levyn koon!)\n", current_page, hdd_offset);
     }
 
-    // --- TAVUKORJATTU INTERRUPT-KUITTAUS ---
-    u16 int_clear_val = (g_mem[ADDR_INT_CLEAR] << 8) | g_mem[ADDR_INT_CLEAR + 1];
-    if (int_clear_val == 1) {
-        m68k_set_irq(&g_cpu, 0);
+    // 2. KÄSITELLÄÄN LAITTEISTOTASON KESKEYTYSKUITTAUS (INT_CLEAR WORD)
+    if (g_mem[ADDR_INT_CLEAR] != 0 || g_mem[ADDR_INT_CLEAR + 1] != 0) {
+        m68k_set_irq(&g_cpu, 0); // Katkaistaan sähköinen linja emulaattorissa [0x01.12, 0x01.22]
+        g_cpu.sr = 0x2000;       // Pakotetaan SR-maski puhtaaksi keskeytysloukun estämiseksi [0x01.22]
+        
         g_mem[ADDR_INT_CLEAR] = 0;
         g_mem[ADDR_INT_CLEAR + 1] = 0;
+        
+        printf("[EMU INT-DEBUG] CPU kuittasi HDD (Level 1) keskeytyksen arvolla -1. Linja nollattu siististi!\n");
     }
 }
 
@@ -248,6 +267,20 @@ int main(void) {
     m68k_init(&g_cpu, g_mem, TOTAL_MEM_SIZE);
     m68k_reset(&g_cpu);
 
+    // Alustetaan ja resetoidaan suoritinydin
+    m68k_init(&g_cpu, g_mem, TOTAL_MEM_SIZE);
+    m68k_reset(&g_cpu);
+
+    g_cpu.sr = 0x2000; 
+
+    g_cpu.vbr = 0x00000000;
+
+    g_cpu.ssp = 0x00080000; // Pinon alku osoitteesta $00080000
+    g_cpu.pc  = 0x00001000; // Pakotetaan CPU aloittamaan suoraan BIOS_INIT-kohdasta!
+
+    printf("[EMU HARDWARE] Suorittimen keskeytysväylä herätetty livenä (SR=0x2000, VBR=0).\n");
+
+
     HINSTANCE hInstance = GetModuleHandle(NULL);
     WNDCLASSEXA wc = {
         .cbSize = sizeof(WNDCLASSEXA),
@@ -275,7 +308,6 @@ int main(void) {
     }
 
     MSG msg;
-    running = TRUE;
 
     running = TRUE;
     while (running) {
@@ -285,50 +317,47 @@ int main(void) {
             DispatchMessage(&msg);
         }
 
-        // 1. AJETAAN SUORITINTA ERITTÄIN PIENISSÄ JAKSOISSA!
-        // Voit ajaa nyt vapaasti vaikka vain 50 tai 100 sykliä kerrallaan!
-        for(int count=0;count<64;count++) {
-            m68k_execute(&g_cpu, 2);
-            u32 current_pc = m68k_get_pc(&g_cpu);
-            printf("PC: $%08x\n",current_pc);       
+        m68k_execute(&g_cpu, 2048);
+        u32 current_pc = m68k_get_pc(&g_cpu);
+        handle_hdd_io();
 
-            if ((current_pc >= 0x00000F30 && current_pc <= 0x00000F36)) {
-                
-                printf("\n==================================================================\n");
-                printf("[EMU HALT] Jarjestelma suoritti hatajarrutuksen osoitteessa 0x%08X!\n", current_pc);
-                printf("==================================================================\n");
-                
-                dump_cpu_crash_state(); // Tulostetaan rekisterivedos konsoliin
-                running = FALSE;        // Pysäytetään emulaattori välittömästi
-                break;
-            }
-
-            // --- RAUTATASON KESKEYTYSREKISTERIN VAHTIMINEN (INT_CLEAR) ---
-            // Koska keskeytyslinja jätetään pystyyn, tämä laukeaa asynkronisesti juuri oikealla kierroksella!
-            u8 int_clear_val = g_mem[ADDR_INT_CLEAR];
-            if (int_clear_val == 1) { // CPU kirjoitti numero 1 merkiksi hdd-kuittauksesta
-                m68k_set_irq(&g_cpu, 0);   // Lasketaan sähköinen linja alas lennosta
-                g_mem[ADDR_INT_CLEAR] = 0; // Nollataan rekisteri
-                printf("[EMU INT-DEBUG] CPU kuittasi keskeytyksen INT 1 laitteistotasolla. Linja nollattu.\n");
-            }
-       
-            handle_hdd_io();
-
-            // Timer (Level 4) liipaisu
-            timer_counter++;
-            if (timer_counter >= 500) { // Säädetty yhteensopivaksi pienen syklin kanssa
-                m68k_set_irq(&g_cpu, 4);
-                timer_counter = 0;
-            }
-
+        if ((current_pc >= 0x00000FF0 && current_pc <= 0x00000FF4)) {
+            
+            printf("\n==================================================================\n");
+            printf("[EMU HALT] Jarjestelma suoritti hatajarrutuksen osoitteessa 0x%08X!\n", current_pc);
+            printf("==================================================================\n");
+            
+            dump_cpu_crash_state(); // Tulostetaan rekisterivedos konsoliin
+            running = FALSE;        // Pysäytetään emulaattori välittömästi
+            break;
         }
 
-        Sleep(1); // Pienennetään sleep-aikaa, koska kierroksia ajetaan nyt useammin sekunnissa
+        // --- RAUTATASON KESKEYTYSREKISTERIN VAHTIMINEN (INT_CLEAR) ---
+        // Koska keskeytyslinja jätetään pystyyn, tämä laukeaa asynkronisesti juuri oikealla kierroksella!
+        u8 int_clear_val = g_mem[ADDR_INT_CLEAR];
+        if (int_clear_val == 1) { // CPU kirjoitti numero 1 merkiksi hdd-kuittauksesta
+            m68k_set_irq(&g_cpu, 0);   // Lasketaan sähköinen linja alas lennosta
+            g_mem[ADDR_INT_CLEAR] = 0; // Nollataan rekisteri
+            printf("[EMU INT-DEBUG] CPU kuittasi keskeytyksen INT 1 laitteistotasolla. Linja nollattu.\n");
+        }
+    
+        // Timer (Level 4) liipaisu
+        timer_counter++;
+        if (timer_counter >= 100) { // Säädetty yhteensopivaksi pienen syklin kanssa
+            m68k_set_irq(&g_cpu, 4);
+            timer_counter = 0;
+        }
+
+        if (running==FALSE) {
+            dump_cpu_crash_state();
+        }
+
+        Sleep(4); // Pienennetään sleep-aikaa, koska kierroksia ajetaan nyt useammin sekunnissa
     }
 
     free(g_mem);
 
-    fclose(g_hdd_file);
+    fclose(g_hdd_file);  
 
     return 0;
 }

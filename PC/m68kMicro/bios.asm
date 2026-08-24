@@ -73,7 +73,7 @@ BIOS_INIT:
             bsr     BIOS_PRINT_STR
 
             ; Sallitaan keskeytykset (SR = $2000)
-;            move.w  #$2000,sr
+            move.w  #$2000,sr
 
 * --- AUTOBOOT LOGIIKKA ---
             lea     MSG_HDD_INIT,a4
@@ -238,7 +238,7 @@ INT_HDD:
 
             ; 4. LAITTEISTOKUITTAUS (Aivan lopussa): 
             ; Kerrotaan emulaattorille, että homma on tehty ja INT 1 linja voidaan laskea alas.
-            move.w  #1,(INT_CLEAR)
+            move.w  #-1,(INT_CLEAR)
 
             movem.l (sp)+,d0-d1/a0-a2   ; Palautetaan rekisterit
             rte                         ; Palataan siististi takaisin pääohjelmaan
@@ -253,7 +253,7 @@ INT_TIMER:
             jsr     (a0)
 NO_TIMER_HOOK:
 
-            move.w  #1,(INT_CLEAR)  
+            move.w  #-1,(INT_CLEAR)  
 
             movem.l (sp)+,d0/a0
             rte
@@ -261,23 +261,30 @@ NO_TIMER_HOOK:
 * =============================================================================
 * PUHDAS MUISTIPEILATTU LEVYLUKU (Memory-Mapped Bank Switching)
 * =============================================================================
-* =============================================================================
-* INT 1 OHJATTU MUISTIPEILATTU LEVYLUKU (WORD ALIGNED)
-* =============================================================================
 HDD_READ_SECTOR:
-            movem.l d0-d1/a1,-(sp)
+            movem.l d0-d1/a1,-(sp)      ; Suojataan rekisterit
             move.l  a0,(BIOS_HDD_TARGET_RAM)
-            lea     (BIOS_HDD_DONE),a1
-            clr.b   (a1)
-            ; 3. KORJAUS: Asetetaan komennoksi 1 (LUE) 16-bittisenä Wordina
+
+            ; 1. Kirjoitetaan komento 1 (LUE) 16-bittisenä Wordina
             move.w  #1,(HDD_CMD)
+            
+            ; 2. Kirjoitetaan sivunumero laukaisevaksi tekijäksi
             move.l  d0,(HDD_PAGE)
+
 WAIT_FOR_HDD_INT:
-            tst.b   (a1)
-            beq     WAIT_FOR_HDD_INT
+            ; KORJAUS: Ei testata epäluotettavaa RAM-muuttujaa (a1), 
+            ; vaan luetaan suoraan rautarekisteriä HDD_CMD!
+            move.w  (HDD_CMD),d1        ; Luetaan 16-bittinen komentorekisteri osoitteesta $001FFF08
+            tst.w   d1                  ; Onko se vielä 1 (eli emulaattori käsittelee sitä)?
+            bne.s   WAIT_FOR_HDD_INT    ; Jos on muuta kuin 0, pyöritään tässä osoitteessa $1220
+
+            ; Heti kun emulaattorin handle_hdd_io() teki työn ja nollasi rekisterin, 
+            ; silmukka murtuu livenä samalla mikrosekunnilla!
+
             movem.l (sp)+,d0-d1/a1
             moveq   #0,d0               ; d0 = 0 (Success)
             rts
+
 
 * =============================================================================
 * INT 1 OHJATTU MUISTIPEILATTU LEVYTALLENNUS (WORD ALIGNED)
