@@ -25,6 +25,12 @@
 
 FILE* g_hdd_file = NULL;
 
+int hdd_busy_timer = 0;   // Simuloi kovalevyn lukupään mekaanista viivettä
+u32 hdd_pending_lba = 0;
+u32 hdd_pending_ram = 0;
+u8 hdd_pending_cmd = 0;
+
+
 u8* g_mem = NULL;
 HWND g_hwnd = NULL;
 M68kCpu g_cpu;
@@ -183,6 +189,7 @@ int main(void) {
     MSG msg;
     running = TRUE;
 
+    running = TRUE;
     while (running) {
         while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
             if (msg.message == WM_QUIT) running = FALSE;
@@ -190,127 +197,100 @@ int main(void) {
             DispatchMessage(&msg);
         }
 
-        u32 last_pc = m68k_get_pc(&g_cpu);
-        m68k_execute(&g_cpu, 500);
-        u32 current_pc = m68k_get_pc(&g_cpu);        
+        // 1. AJETAAN SUORITINTA ERITTÄIN PIENISSÄ JAKSOISSA!
+        // Voit ajaa nyt vapaasti vaikka vain 50 tai 100 sykliä kerrallaan!
+        m68k_execute(&g_cpu, 1000);
 
-        printf("$%08x\n",current_pc);
+        u32 current_pc = m68k_get_pc(&g_cpu);
 
+        printf("PC: $%08x\n",current_pc);
 
-        // Vahtitaan PC-arvoa turvallisesti sallitun 4MB RAM-muistin rajoissa
-        if (m68k_get_pc(&g_cpu) >= TOTAL_MEM_SIZE) {
-            printf("\n[ERROR] Bus Error / Address Error: CPU yritti suorittaa koodia muistin ulkopuolelta!\n");
-            dump_cpu_crash_state();
-            running = FALSE; 
-        }
-
-        // --- UUSI ARKKITEHTUURINEN GLOBAALI HALT-VAHTI ---
-        // Jos PC on saavuttanut kiinteän GLOBAL_HALTLOOP-alueen ($0830 - $0836)
-        if (current_pc >= 0x00000ff0 && current_pc <= 0x00000ff6) {
+        // --- LIVE-VAHTI (PC-TARKISTUS SUORAAN KIERROKSELLA) ---
+        if (current_pc == 0x000011BC || current_pc == 0x000011BE || current_pc == 0x00000830) {
             printf("\n==================================================================\n");
-            printf("[EMU HALT] CPU pyysi siistia alasajoa (GLOBAL_HALTLOOP saavutettu)!\n");
+            printf("[EMU HALT] Pysäytettiin livenä osoitteessa 0x%08X!\n", current_pc);
             printf("==================================================================\n");
-            
-            dump_cpu_crash_state(); // Tulostetaan rekisterivedos konsoliin
-            running = FALSE;        // Sammutetaan emulaattorin silmukka siististi
+            dump_cpu_crash_state();
+            running = FALSE;
+            break; 
         }
 
-        // --- RAUTATASON KESKEYTYSREKISTERIN VAHTIMINEN (INT_CLEAR BITMASK) ---
-        u8 int_clear_mask = g_mem[ADDR_INT_CLEAR];
-        if (int_clear_mask != 0) {
-            // Tarkistetaan bitti 1 (HDD / Level 1) -> Maski 0x02
-            if (int_clear_mask & 0x02) {
-                m68k_set_irq(&g_cpu, 1); // Rocket68:ssa linjan nollaus tehdään tarjoamalla tila/arvo 0, 
-                // mutta jos kirjastossasi m68k_set_irq(cpu, 1) asettaa ja jokin muu nollaa,
-                // käytä virallista kuittaustoimintoa. Jos m68k_set_irq(cpu, 0) nollaa KAIKKI, 
-                // muutetaan Rocket68-ytimen linjaa bittikohtaisesti:
+        // --- RAUTATASON KESKEYTYSREKISTERIN VAHTIMINEN (INT_CLEAR) ---
+        // Koska keskeytyslinja jätetään pystyyn, tämä laukeaa asynkronisesti juuri oikealla kierroksella!
+        u8 int_clear_val = g_mem[ADDR_INT_CLEAR];
+        if (int_clear_val == 1) { // CPU kirjoitti numero 1 merkiksi hdd-kuittauksesta
+            m68k_set_irq(&g_cpu, 0);   // Lasketaan sähköinen linja alas lennosta
+            g_mem[ADDR_INT_CLEAR] = 0; // Nollataan rekisteri
+            printf("[EMU INT-DEBUG] CPU kuittasi keskeytyksen INT 1 laitteistotasolla. Linja nollattu.\n");
+        }
+
+        // --- ASYNKRONINEN KIINTOLEVYOHJAIN TARKALLA SEKTORIDEBUGILLA ---
+        u8 hdd_cmd = g_mem[ADDR_HDD_CMD];
+        
+        // Vaihe A: CPU antoi uuden komennon, tallennetaan parametrit ja aloitetaan viive
+        if (hdd_cmd != 0 && hdd_busy_timer == 0) {
+            hdd_pending_lba = (g_mem[ADDR_HDD_LBA] << 24) | (g_mem[ADDR_HDD_LBA+1] << 16) | 
+                              (g_mem[ADDR_HDD_LBA+2] << 8) | g_mem[ADDR_HDD_LBA+3];
+            hdd_pending_ram = (g_mem[ADDR_HDD_BUFFER] << 24) | (g_mem[ADDR_HDD_BUFFER+1] << 16) | 
+                               (g_mem[ADDR_HDD_BUFFER+2] << 8) | g_mem[ADDR_HDD_BUFFER+3];
+            hdd_pending_cmd = hdd_cmd;
+
+            g_mem[ADDR_HDD_STATUS] = 1; // Ohjain ilmoittaa olevansa VARATTU (Busy)
+            g_mem[ADDR_HDD_CMD] = 0;    // Kuitataan komento vastaanotetuksi raudalta
+
+            // ASETETAAN VIIVE: 50 kierrosta simuloi hienosti levyn pyörähdystä
+            hdd_busy_timer = 50;        
+            
+            printf("[EMU HDD-RAUTA] >>> KOMENTO VASTAANOTETTU: %s | Sektori LBA: %u | RAM-osoite: 0x%08X\n", 
+                   (hdd_pending_cmd == 1 ? "LUE (READ)" : "KIRJOITA (WRITE)"), 
+                   hdd_pending_lba, hdd_pending_ram);
+            printf("[EMU HDD-RAUTA] Ohjain siirtyi Busy-tilaan (STATUS=1) simulaatioviiveen ajaksi...\n");
+        }
+
+        // Vaihe B: Ohjain raksuttaa taustalla viivettä alaspäin
+        if (hdd_busy_timer > 0) {
+            hdd_busy_timer--;
+            
+            // Kun mekaaninen hakuajastin saavuttaa nollan, suoritetaan varsinainen DMA-siirto!
+            if (hdd_busy_timer == 0) {
+                printf("[EMU HDD-RAUTA] Viive paattyi. Suoritetaan fyysinen DMA-siirto tiedostosta RAMiin...\n");
                 
-                // HUOMIO: Koska useimmat 68000-ytimet (kuten Musashi) nollaavat linjan komennolla m68k_set_irq(0),
-                // ja jos sinulla on vain yksi globaali nollaus, tehdään se tässä.
-                // Mutta jos Rocket68 tukee erillistä linjan alaslaskua (esim. m68k_set_irq(&g_cpu, 1, 0)), 
-                // käytä sitä. Oletetaan standardi tapa:
-                m68k_set_irq(&g_cpu, 0); 
-                printf("[EMU INT-DEBUG] CPU kuittasi HDD (Level 1) keskeytyksen bittimaskilla.\n");
-            }
-            
-            // Tarkistetaan bitti 2 (Keyboard / Level 2) -> Maski 0x04
-            if (int_clear_mask & 0x04) {
-                printf("[EMU INT-DEBUG] CPU kuittasi Keyboard (Level 2) keskeytyksen bittimaskilla.\n");
-            }
+                if (g_hdd_file && hdd_pending_ram < TOTAL_MEM_SIZE) {
+                    // Siirrytään tarkan LBA-lohkon kohdalle tiedostossa (512 tavua per sektori)
+                    fseek(g_hdd_file, hdd_pending_lba * 512, SEEK_SET);
+                    
+                    if (hdd_pending_cmd == 1) {
+                        size_t read_bytes = fread(&g_mem[hdd_pending_ram], 1, 512, g_hdd_file);
+                        printf("[EMU HDD-RAUTA] <<< DMA LUE VALMIS: Luettu %zu tavua tiedostosta osoitteeseen 0x%08X.\n", 
+                               read_bytes, hdd_pending_ram);
+                    } else {
+                        size_t written_bytes = fwrite(&g_mem[hdd_pending_ram], 1, 512, g_hdd_file);
+                        fflush(g_hdd_file);
+                        printf("[EMU HDD-RAUTA] <<< DMA KIRJOITUS VALMIS: Kirjoitettu %zu tavua levylle osoitteesta 0x%08X.\n", 
+                               written_bytes, hdd_pending_ram);
+                    }
+                    
+                    g_mem[ADDR_HDD_STATUS] = 0; // Ohjain vapautuu onnistuneesti (STATUS=0)
+                } else {
+                    printf("[EMU HDD-RAUTA] VIRHE: Viallinen tiedostokahva tai RAM-osoite 0x%08X muistin ulkopuolella!\n", hdd_pending_ram);
+                    g_mem[ADDR_HDD_STATUS] = 2; // Ohjain ilmoittaa virheestä (STATUS=2)
+                }
 
-            // Tarkistetaan bitti 4 (Timer / Level 4) -> Maski 0x10
-            if (int_clear_mask & 0x10) {
-                printf("[EMU INT-DEBUG] CPU kuittasi Timer (Level 4) keskeytyksen bittimaskilla.\n");
+                // Nostetaan laitteistokeskeytys ja jätetään se pystyyn, kunnes CPU kuittaa sen INT_CLEARiin!
+                printf("[EMU INT-DEBUG] Nostetaan asynkroninen laitteistokeskeytys: LEVEL 1 INT (HDD)\n");
+                m68k_set_irq(&g_cpu, 1);
             }
-
-            // Pyyhitään käsitellyt bitit pois rekisteristä
-            g_mem[ADDR_INT_CLEAR] &= ~int_clear_mask; 
         }
 
-        // Liipaisualgoritmi Timerille (esim. joka toisella pääsilmukan kierroksella jos Sleep on 16ms, 
-        // tai tarkemmin simuloimalla CPU-syklejä. Yksinkertainen tapa:)
+        // Timer (Level 4) liipaisu
         timer_counter++;
-        if (timer_counter >= 30) { // Voit säätää taajuutta tästä
-            m68k_set_irq(&g_cpu, 4); // Nostetaan Level 4 Keskeytys (Timer)
+        if (timer_counter >= 500) { // Säädetty yhteensopivaksi pienen syklin kanssa
+            m68k_set_irq(&g_cpu, 4);
             timer_counter = 0;
         }
 
-
-    // main.c - Pääsilmukan sisällä (while running)
-    u8 hdd_cmd = g_mem[ADDR_HDD_CMD];
-    if (hdd_cmd == 1 || hdd_cmd == 2) {
-        g_mem[ADDR_HDD_STATUS] = 1; // Ohjain varattu, CPU pysäytetään siirron ajaksi
-
-        u32 lba = (g_mem[ADDR_HDD_LBA] << 24) | (g_mem[ADDR_HDD_LBA+1] << 16) | 
-                (g_mem[ADDR_HDD_LBA+2] << 8) | g_mem[ADDR_HDD_LBA+3];
-        u32 ram_addr = (g_mem[ADDR_HDD_BUFFER] << 24) | (g_mem[ADDR_HDD_BUFFER+1] << 16) | 
-                    (g_mem[ADDR_HDD_BUFFER+2] << 8) | g_mem[ADDR_HDD_BUFFER+3];
-
-        if (g_hdd_file && ram_addr < TOTAL_MEM_SIZE) {
-            fseek(g_hdd_file, lba * 512, SEEK_SET);
-            if (hdd_cmd == 1) {
-                fread(&g_mem[ram_addr], 1, 512, g_hdd_file); // DMA-siirto suoraan RAMiin
-            } else {
-                fwrite(&g_mem[ram_addr], 1, 512, g_hdd_file);
-                fflush(g_hdd_file);
-            }
-            g_mem[ADDR_HDD_STATUS] = 0; // DMA valmis onnistuneesti
-        } else {
-            g_mem[ADDR_HDD_STATUS] = 2; // DMA-virhe
-        }
-
-        g_mem[ADDR_HDD_CMD] = 0; // Kuitataan komento suoritetuksi
-        
-        // NOSTETAAN LEVEL 1 KESKEYTYSPULSSI (IRQ STROBE)
-        printf("[EMU IRQ-DEBUG] Nostetaan laitteistokeskeytys: LEVEL 1 IRQ (HDD)\n");
-        m68k_set_irq(&g_cpu, 1);         
+        Sleep(1); // Pienennetään sleep-aikaa, koska kierroksia ajetaan nyt useammin sekunnissa
     }
-
-        u16 frequency = (u16)((g_mem[ADDR_AUDIO_BEEP] << 8) | g_mem[ADDR_AUDIO_BEEP + 1]);
-        if (frequency > 0) {
-            // Korvataan kohiseva Beep asynkronisilla Windows-järjestelmä-äänillä taajuuden mukaan:
-            if (frequency >= 800) {
-                // Korkea taajuus -> Standardi ilmoitusääni (Asterisk / Info)
-                MessageBeep(MB_ICONINFORMATION);
-            } else {
-                // Matala taajuus -> Kriittinen virheääni (Hand / Stop / Error)
-                MessageBeep(MB_ICONHAND);
-            }
-            
-            // Nollataan rekisteri, jottei jää soimaan luuppiin
-            g_mem[ADDR_AUDIO_BEEP] = 0;
-            g_mem[ADDR_AUDIO_BEEP + 1] = 0;
-        }
-
-
-        if (g_hwnd) {
-            InvalidateRect(g_hwnd, NULL, FALSE);
-            UpdateWindow(g_hwnd);
-        }
-
-        Sleep(16); 
-    }
-
 
     free(g_mem);
 

@@ -16,6 +16,9 @@ HDD_BUFFER  EQU     $001FFF04
 HDD_CMD     EQU     $001FFF08
 HDD_STATUS  EQU     $001FFF09
 
+* --- KESKEYTYSOBJAIMEN REKISTERIT & BITTI-INDEKSIT (bset-käskyä varten) ---
+INT_CLEAR       EQU     $001FFF0C           ; Laitteistotason keskeytyskuittaus [1]
+
             org     $00000000
 * --- M68k Vektoritaulukko ---
             dc.l    $00080000           ; Initial Stack Pointer (SSP)
@@ -176,17 +179,22 @@ BIOS_PRINT_STR:
 * =============================================================================
 INT_VBLANK:
             movem.l d0/a0,-(sp)
+
             move.b  (VBLANK),d0
             movea.l (USER_VBLANK),a0
             cmpa.l  #0,a0
             beq     NO_VBL_HOOK
             jsr     (a0)
 NO_VBL_HOOK:
+
+            move.b  #1,(INT_CLEAR)  
+
             movem.l (sp)+,d0/a0
             rte
 
 INT_KEYBOARD:
             movem.l d0/a0,-(sp)
+
             move.b  (KEYBOARD),d0
             beq     KBD_EXIT
             btst    #7,d0
@@ -205,21 +213,19 @@ INT_KEYBOARD:
 KEY_RELEASED:
             clr.b   (KEYBOARD)
 KBD_EXIT:
+            move.b  #1,(INT_CLEAR)  
+
             movem.l (sp)+,d0/a0
             rte
 
 INT_HDD:
             movem.l d0/a0,-(sp)         ; Suojataan käytettävät rekisterit
-            
-            move.b  (HDD_STATUS),d0          
 
-            ; Tallennetaan saatu status muuttujaan, josta pääohjelma näkee tuloksen
+            move.b  (HDD_STATUS),d0          
             move.b  d0,(BIOS_HDD_STATUS_REG)
             
             ; Merkitään operaatio valmiiksi
             move.b  #1,(BIOS_HDD_DONE)
-
-            bset    #1,(INT_CLEAR)      ; Bitti 1 tarkoittaa arvoa %00000010 ($02)
 
             ; Kutsutaan mahdollista sovellustason koukkua
             movea.l (USER_HDD),a0
@@ -227,17 +233,24 @@ INT_HDD:
             beq     .no_hook
             jsr     (a0)
 .no_hook:
+
+            move.b  #1,(INT_CLEAR)  
+
             movem.l (sp)+,d0/a0
             rte 
 
 INT_TIMER:
             movem.l d0/a0,-(sp)
+
             addq.l  #1,(SYS_TICKS)
             movea.l (USER_TIMER),a0
             cmpa.l  #0,a0
             beq     NO_TIMER_HOOK
             jsr     (a0)
 NO_TIMER_HOOK:
+
+            move.b  #1,(INT_CLEAR)  
+
             movem.l (sp)+,d0/a0
             rte
 
