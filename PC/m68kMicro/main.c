@@ -153,8 +153,6 @@ void handle_hdd_io(void) {
     }
 }
 
-
-
 int load_rom_file(const char* filename, u32 dest_addr, u32 max_size) {
     FILE* f = fopen(filename, "rb");
     if (!f) {
@@ -179,36 +177,37 @@ int main(void) {
     g_mem = calloc(TOTAL_MEM_SIZE, 1);
     if (!g_mem) return 1;
 
-/*
     g_hdd_file = fopen("hdd.img", "rb+");
-    if (!g_hdd_file) {
-        // Jos tiedostoa ei ole, luodaan tyhjä 10MB virtuaalilevy testejä varten
-        g_hdd_file = fopen("hdd.img", "wb+");
-        if (g_hdd_file) {
-            u8* empty_disk = calloc(1024 * 1024 * 10, 1);
-            fwrite(empty_disk, 1, 1024 * 1024 * 10, g_hdd_file);
-            free(empty_disk);
-            fseek(g_hdd_file, 0, SEEK_SET);
+    
+    if (g_hdd_file) {
+        printf("[HDD] hdd.img kytketty onnistuneesti ohjaimeen muokkaustilassa.\n");
+        
+        fseek(g_hdd_file, 0, SEEK_END);
+        long hdd_size = ftell(g_hdd_file);
+        fseek(g_hdd_file, 0, SEEK_SET);
+        
+        g_hdd_mem = calloc(hdd_size, 1);
+        if (g_hdd_mem) {
+            // KORJAUS: Muutettu f_hd -> g_hdd_file
+            fread(g_hdd_mem, 1, hdd_size, g_hdd_file); 
+            printf("[EMU HDD] Koko hdd.img (%ld tavua) ladattu onnistuneesti virtuaalimuistiin.\n", hdd_size);
         }
-    }
-    if (!g_hdd_file) {
-        printf("[ERROR] Virtuaalisen kovalevyn (hdd.img) avaaminen epaonnistui!\n");
     } else {
-        printf("[HDD] hdd.img liitetty onnistuneesti ohjaimeen.\n");
+        printf("[KRIITTINEN VIRHE] hdd.img puuttuu! Aja nmake ensin, jotta Python-skripti luo levyn.\n");
+        return -1; 
     }
 
-*/
 
     FILE* f;
 
     // 1. Ladataan BIOS.ROM osoitteeseen 0x00000000
-    f = fopen("ROMs\\BIOS.ROM", "rb");
+    f = fopen("os_bin\\bios.bin", "rb");
     if (f) {
         fread(&g_mem[0x00000000], 1, 20480, f);
         fclose(f);
-        printf("[EMU] ROMs\\BIOS.ROM esiladattu osoitteeseen 0x00000000.\n");
+        printf("[EMU] os_bin\\BIOS.ROM esiladattu osoitteeseen 0x00000000.\n");
     } else {
-        printf("Kriittinen virhe: ROMs\\BIOS.ROM puuttuu!\n");
+        printf("Kriittinen virhe: os_bin\\BIOS.ROM puuttuu!\n");
         return -1;
     }
 
@@ -229,15 +228,12 @@ int main(void) {
     }
 
     // 4. Ladataan FONT.ROM osoitteeseen 0x00220000
-    f = fopen("ROMs\\FONT.ROM", "rb");
+    f = fopen("os_bin\\font.bin", "rb");
     if (f) {
         fread(&g_mem[0x00220000], 1, 2048, f);
         fclose(f);
-        printf("[EMU] ROMs\\FONT.ROM esiladattu osoitteeseen 0x00220000.\n");
+        printf("[EMU] os_bin\\font.bin esiladattu osoitteeseen 0x00220000.\n");
     }
-
-
-/*
 
     // Varataan tila ja luetaan koko levy RAMiin
     g_hdd_mem = calloc(HDD_TOTAL_SIZE, 1);
@@ -247,7 +243,7 @@ int main(void) {
         fclose(f_hd);
         printf("[EMU HDD] Koko hdd.img (10MB) ladattu onnistuneesti virtuaalimuistiin.\n");
     }
-*/
+
 
     m68k_init(&g_cpu, g_mem, TOTAL_MEM_SIZE);
     m68k_reset(&g_cpu);
@@ -291,7 +287,7 @@ int main(void) {
 
         // 1. AJETAAN SUORITINTA ERITTÄIN PIENISSÄ JAKSOISSA!
         // Voit ajaa nyt vapaasti vaikka vain 50 tai 100 sykliä kerrallaan!
-        for(int count=0;count<512;count++) {
+        for(int count=0;count<64;count++) {
             m68k_execute(&g_cpu, 2);
             u32 current_pc = m68k_get_pc(&g_cpu);
             printf("PC: $%08x\n",current_pc);       
@@ -307,7 +303,6 @@ int main(void) {
                 break;
             }
 
-
             // --- RAUTATASON KESKEYTYSREKISTERIN VAHTIMINEN (INT_CLEAR) ---
             // Koska keskeytyslinja jätetään pystyyn, tämä laukeaa asynkronisesti juuri oikealla kierroksella!
             u8 int_clear_val = g_mem[ADDR_INT_CLEAR];
@@ -317,7 +312,7 @@ int main(void) {
                 printf("[EMU INT-DEBUG] CPU kuittasi keskeytyksen INT 1 laitteistotasolla. Linja nollattu.\n");
             }
        
-//        handle_hdd_io();
+            handle_hdd_io();
 
             // Timer (Level 4) liipaisu
             timer_counter++;

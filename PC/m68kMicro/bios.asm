@@ -72,11 +72,6 @@ BIOS_INIT:
             lea     MSG_WELCOME,a4
             bsr     BIOS_PRINT_STR
 
-            lea     MSG_DIRECT_BOOT,a4
-            bsr     BIOS_PRINT_STR
-
-            jmp     $00006000              
-
             ; Sallitaan keskeytykset (SR = $2000)
 ;            move.w  #$2000,sr
 
@@ -374,8 +369,6 @@ NEXT_PIXEL:
             dbra    d4,DRAW_ROW
             movem.l (sp)+,d1-d6/a0-a1
             rts
-
-
 
 * =============================================================================
 * LOOKUP-TAULUKOT, MERKKIJONOT JA RAM-MUUTTUJAT
