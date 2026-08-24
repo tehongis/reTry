@@ -12,6 +12,8 @@ FONT_ROM    EQU     $00220000
 
 HDD_PAGE        EQU     $001FFF00           ; Rekisteri, johon kirjoitetaan LBA (Long)
 HDD_WINDOW      EQU     $001F0000           ; Maaginen 512 tavun ikkuna
+HDD_CMD         EQU     $001FFF08           ; Ohjaimen komentorekisteri (1=Lue, 2=Kirjoita)
+
 
 * --- KESKEYTYSOBJAIMEN REKISTERIT & BITTI-INDEKSIT (bset-käskyä varten) ---
 INT_CLEAR       EQU     $001FFF0C           ; Laitteistotason keskeytyskuittaus [1]
@@ -411,6 +413,7 @@ SCANCODE_LUT:
 
             org     $00004000
             EVEN
+BIOS_HDD_TARGET_RAM:  ds.l    1             ; Varataan 4 tavua (Long) kohdemuistiosoitteelle
 USER_VBLANK:  ds.l    1
 USER_KBD:     ds.l    1
 USER_HDD:     ds.l    1

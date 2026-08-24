@@ -104,3 +104,15 @@ Jotta kiintolevy (`hdd.img`) tunnistetaan käynnistyskelpoiseksi, sen lohkon 0 (
 * Tavu 511: **`$53`** (ASCII 'S')
 
 Jos allekirjoitus löytyy, BIOS kopioi lohkon sisällön muistiin osoitteeseen `$00005000` ja siirtää suorituksen sinne käskyllä `jmp $00005000`.
+
+
+
+
+
+# Salli koko projektin bin-kansion suoritus ilman suojaustarkistuksia
+Add-MpPreference -ExclusionPath "C:\Users\tehon\GitHub\reTry\PC\m68kMicro\bin"
+
+# Salli myös erikseen itse emulaattorin binääri varmuuden vuoksi
+Add-MpPreference -ExclusionProcess "rocket68_emu.exe"
+
+echo "Windows-suojausasetukset päivitetty! bin-kansio on nyt sallittu."

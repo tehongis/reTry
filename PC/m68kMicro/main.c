@@ -16,9 +16,12 @@
 #define ADDR_PALETTE_START (ADDR_FB_START + FB_SIZE) 
 #define ADDR_FONT_ROM     0x00220000  
 
-#define ADDR_HDD_PAGE   0x001FFF00   // LBA-sivunumero (Long)
-#define ADDR_HDD_WINDOW 0x001F0000   // 512 tavun maaginen ikkuna (0x001F0000 - 0x001F01FF)
-#define HDD_TOTAL_SIZE  (10 * 1024 * 1024) // 10 MB kiintolevy
+#define ADDR_HDD_PAGE      0x001FFF00
+#define ADDR_HDD_WINDOW    0x001F0000 
+#define HDD_TOTAL_SIZE     (10 * 1024 * 1024) 
+#define ADDR_HDD_CMD       0x001FFF08 // Lisätty puuttuva määrittely [0x1.1]
+#define ADDR_HDD_STATUS    0x001FFF09
+#define ADDR_INT_CLEAR     0x001FFF0C
 
 u8* g_hdd_mem = NULL; // Globaali puskuri koko kiintolevyn sisällölle
 u32 last_mapped_page = 0xFFFFFFFF; // Seuraa, milloin sivu muuttuu
@@ -210,12 +213,25 @@ int main(void) {
 
         // 1. AJETAAN SUORITINTA ERITTÄIN PIENISSÄ JAKSOISSA!
         // Voit ajaa nyt vapaasti vaikka vain 50 tai 100 sykliä kerrallaan!
-        m68k_execute(&g_cpu, 32);
+        for(int count=0;count<512;count++) {
+            m68k_execute(&g_cpu, 2);
+            u32 current_pc = m68k_get_pc(&g_cpu);
+            printf("PC: $%08x\n",current_pc);       
 
-        u32 current_pc = m68k_get_pc(&g_cpu);
+        // --- PÄIVITETTY GLOBAALI RAUTAHALT-VAHTI ($0F00 ALUEELLE) ---
+        // Jos PC on saavuttanut uuden GLOBAL_HALTLOOP-alueen ($0F30 - $0F36)
+        // tai jos se on juuttunut virhehaaraan ($11BC - $11C2), sammutetaan kone!
+            if ((current_pc >= 0x00000F30 && current_pc <= 0x00000F36)) {
+                
+                printf("\n==================================================================\n");
+                printf("[EMU HALT] Jarjestelma suoritti hatajarrutuksen osoitteessa 0x%08X!\n", current_pc);
+                printf("==================================================================\n");
+                
+                dump_cpu_crash_state(); // Tulostetaan rekisterivedos konsoliin
+                running = FALSE;        // Pysäytetään emulaattori välittömästi
+                break;
+            }
 
-        // printf("PC: $%08x\n",current_pc);
-        
 
         // --- RAUTATASON KESKEYTYSREKISTERIN VAHTIMINEN (INT_CLEAR) ---
         // Koska keskeytyslinja jätetään pystyyn, tämä laukeaa asynkronisesti juuri oikealla kierroksella!
@@ -226,38 +242,33 @@ int main(void) {
             printf("[EMU INT-DEBUG] CPU kuittasi keskeytyksen INT 1 laitteistotasolla. Linja nollattu.\n");
         }
 
-        // --- MUISTIPEILATTU LEVYOHJAIN + INT 1 LIIPAISU (LUKU & KIRJOITUS) ---
+        // --- MUISTIPEILATTU LEVYOHJAIN + INT 1 ---
         u32 current_page = (g_mem[ADDR_HDD_PAGE] << 24) | (g_mem[ADDR_HDD_PAGE+1] << 16) | 
                            (g_mem[ADDR_HDD_PAGE+2] << 8)  | g_mem[ADDR_HDD_PAGE+3];
-        u8 hdd_cmd = g_mem[ADDR_HDD_CMD]; // 1 = Lue, 2 = Kirjoita
+        
+        u8 hdd_cmd = g_mem[ADDR_HDD_CMD];
 
         if (hdd_cmd != 0) {
             u32 hdd_offset = current_page * 512;
             if (hdd_offset + 512 <= HDD_TOTAL_SIZE) {
                 
                 if (hdd_cmd == 1) {
-                    // --- REAALIAIKAINEN LUKU ---
                     memcpy(&g_mem[ADDR_HDD_WINDOW], &g_hdd_mem[hdd_offset], 512);
-                    printf("[EMU HDD] LBA %u siirretty ikkunaan 0x%001F0000. Nostetaan INT 1.\n", current_page);
+                    printf("[EMU HDD] LBA %u luettu ikkunaan. INT 1.\n", current_page);
                 } 
                 else if (hdd_cmd == 2) {
-                    // --- REAALIAIKAINEN TALLENNUS ---
-                    // Kopioidaan tiedot suorittimen maagisesta ikkunasta virtuaalilevyn RAM-puskuriin
-                    memcpy(&g_hdd_mem[hdd_offset], &g_mem[ADDR_WINDOW], 512);
+                    // Korjattu nimi: ADDR_HDD_WINDOW
+                    memcpy(&g_hdd_mem[hdd_offset], &g_mem[ADDR_HDD_WINDOW], 512);
                     
-                    // Kirjoitetaan muutos heti livenä hdd.img-tiedostoon, jotta se säilyy pysyvästi!
                     if (g_hdd_file) {
                         fseek(g_hdd_file, hdd_offset, SEEK_SET);
                         fwrite(&g_hdd_mem[hdd_offset], 1, 512, g_hdd_file);
                         fflush(g_hdd_file);
                     }
-                    printf("[EMU HDD] Ikkunan sisallot tallennettu LBA-lohkoon %u ja synkronoitukin levylle! Nostetaan INT 1.\n", current_page);
+                    printf("[EMU HDD] LBA %u tallennettu. INT 1.\n", current_page);
                 }
 
-                g_mem[ADDR_HDD_CMD] = 0; // Kuitataan komento suoritetuksi raudalta
-                last_mapped_page = current_page;
-                
-                // Nostetaan Level 1 keskeytys merkiksi operaation valmistumisesta
+                g_mem[ADDR_HDD_CMD] = 0; 
                 m68k_set_irq(&g_cpu, 1); 
             }
         }
@@ -268,6 +279,9 @@ int main(void) {
             m68k_set_irq(&g_cpu, 4);
             timer_counter = 0;
         }
+
+        }
+
 
         Sleep(1); // Pienennetään sleep-aikaa, koska kierroksia ajetaan nyt useammin sekunnissa
     }
