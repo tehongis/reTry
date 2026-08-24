@@ -72,8 +72,13 @@ BIOS_INIT:
             lea     MSG_WELCOME,a4
             bsr     BIOS_PRINT_STR
 
+            lea     MSG_DIRECT_BOOT,a4
+            bsr     BIOS_PRINT_STR
+
+            jmp     $00006000              
+
             ; Sallitaan keskeytykset (SR = $2000)
-            move.w  #$2000,sr
+;            move.w  #$2000,sr
 
 * --- AUTOBOOT LOGIIKKA ---
             lea     MSG_HDD_INIT,a4
@@ -186,7 +191,7 @@ INT_VBLANK:
             jsr     (a0)
 NO_VBL_HOOK:
 
-            move.b  #1,(INT_CLEAR)  
+            move.w  #1,(INT_CLEAR)  
 
             movem.l (sp)+,d0/a0
             rte
@@ -212,7 +217,7 @@ INT_KEYBOARD:
 KEY_RELEASED:
             clr.b   (KEYBOARD)
 KBD_EXIT:
-            move.b  #1,(INT_CLEAR)  
+            move.w  #1,(INT_CLEAR)  
 
             movem.l (sp)+,d0/a0
             rte
@@ -238,7 +243,7 @@ INT_HDD:
 
             ; 4. LAITTEISTOKUITTAUS (Aivan lopussa): 
             ; Kerrotaan emulaattorille, että homma on tehty ja INT 1 linja voidaan laskea alas.
-            move.b  #1,(INT_CLEAR)
+            move.w  #1,(INT_CLEAR)
 
             movem.l (sp)+,d0-d1/a0-a2   ; Palautetaan rekisterit
             rte                         ; Palataan siististi takaisin pääohjelmaan
@@ -253,7 +258,7 @@ INT_TIMER:
             jsr     (a0)
 NO_TIMER_HOOK:
 
-            move.b  #1,(INT_CLEAR)  
+            move.w  #1,(INT_CLEAR)  
 
             movem.l (sp)+,d0/a0
             rte
@@ -262,67 +267,45 @@ NO_TIMER_HOOK:
 * PUHDAS MUISTIPEILATTU LEVYLUKU (Memory-Mapped Bank Switching)
 * =============================================================================
 * =============================================================================
-* INT 1 OHJATTU MUISTIPEILATTU LEVYLUKU
+* INT 1 OHJATTU MUISTIPEILATTU LEVYLUKU (WORD ALIGNED)
 * =============================================================================
 HDD_READ_SECTOR:
             movem.l d0-d1/a1,-(sp)
-            
-            ; 1. Tallennetaan kohde RAM-osoite BIOSin sisäiseen muuttujaan, 
-            ; jotta keskeytysrutiini tietää, minne ikkunan tiedot kopioidaan.
             move.l  a0,(BIOS_HDD_TARGET_RAM)
-            
-            ; 2. Nollataan valmis-lippu
             lea     (BIOS_HDD_DONE),a1
             clr.b   (a1)
-
-            ; 3. Kirjoitetaan sivunumero -> Emulaattori lataa ikkunan ja laukaisee INT 1:n
+            ; 3. KORJAUS: Asetetaan komennoksi 1 (LUE) 16-bittisenä Wordina
+            move.w  #1,(HDD_CMD)
             move.l  d0,(HDD_PAGE)
-
 WAIT_FOR_HDD_INT:
-            ; Suoritin pyörii tässä vapaasti pienissä sykleissä.
-            ; Kun INT 1 pamahtaa, INT_HDD suorittaa kopioinnin ja murentaa tämän loopin!
             tst.b   (a1)
             beq     WAIT_FOR_HDD_INT
-
             movem.l (sp)+,d0-d1/a1
             moveq   #0,d0               ; d0 = 0 (Success)
             rts
 
 * =============================================================================
-* INT 1 OHJATTU MUISTIPEILATTU LEVYTALLENNUS
+* INT 1 OHJATTU MUISTIPEILATTU LEVYTALLENNUS (WORD ALIGNED)
 * =============================================================================
 HDD_WRITE_SECTOR:
-            movem.l d0-d1/a1-a2,-(sp)   ; Suojataan rekisterit
-            
-            ; 1. Nollataan valmis-lippu
+            movem.l d0-d1/a1-a2,-(sp)
             lea     (BIOS_HDD_DONE),a1
             clr.b   (a1)
-
-            ; 2. Kopioidaan 512 tavua käyttäjän RAM-muistista (a0) maagiseen ikkunaan
-            movea.l a0,a2               ; Lähde: Käyttäjän data
-            lea     (HDD_WINDOW),a0     ; Kohde: Maaginen 512B ikkuna
-            
-            move.w  #127,d1             ; 128 pitkäsanaa = 512 tavua
+            movea.l a0,a2
+            lea     (HDD_WINDOW),a0
+            move.w  #127,d1
 .copy_to_window:
             move.l  (a2)+,(a0)+
             dbra    d1,.copy_to_window
-
-            ; 3. Asetetaan komennoksi 2 (KIRJOITA) laitteistorekisteriin
-            move.b  #2,(HDD_CMD)
-
-            ; 4. Kirjoitetaan sivunumero -> Emulaattori tallentaa ikkunan tiedot ja laukaisee INT 1:n
+            ; 3. KORJAUS: Asetetaan komennoksi 2 (KIRJOITA) 16-bittisenä Wordina
+            move.w  #2,(HDD_CMD)
             move.l  d0,(HDD_PAGE)
-
 WAIT_FOR_WRITE_INT:
-            ; Suoritin odottaa tässä, kunnes INT_HDD rutiini pamahtaa päälle, 
-            ; kuittaa linjan ja kääntää tämän muuttujan ykköseksi.
             tst.b   (a1)
             beq     WAIT_FOR_WRITE_INT
-
             movem.l (sp)+,d0-d1/a1-a2
             moveq   #0,d0               ; d0 = 0 (Success)
             rts
-
 
 CLEAR_SCREEN:
             movea.l #FB_START,a0
@@ -404,7 +387,8 @@ MSG_CHECK_SIG:dc.b  "Checking boot signature...",10,0
 MSG_BOOT_OK:  dc.b  "Success: Launching loader.exe...",10,0
 MSG_ERR_IO:   dc.b  "Fatal: HDD read error!",10,0
 MSG_ERR_SIG:  dc.b  "Fatal: No bootable signature found!",10,0
-
+MSG_DIRECT_BOOT: dc.b "Esiladattu RAM-kayttojarjestelma havaittu. Kaynnistetaan Monitori...",10,0
+            EVEN
 SCANCODE_LUT:
             dc.b    0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 8, 9
             dc.b    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', $0D, 0, 'A', 'S'

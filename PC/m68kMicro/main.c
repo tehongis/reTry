@@ -115,6 +115,45 @@ int illegal_instruction_callback(int opcode) {
     return 0; 
 }
 
+// --- TAVUKORJATTU LEVYOHJAIN (main.c) ---
+void handle_hdd_io(void) {
+    // Luetaan 16-bittinen sana (Big-Endian) suoraan muistitaulukosta
+    u16 hdd_cmd = (g_mem[ADDR_HDD_CMD] << 8) | g_mem[ADDR_HDD_CMD + 1];
+    if (hdd_cmd == 0) return;
+
+    // Luetaan 32-bittinen sivu (Long) Big-Endian-muodossa
+    u32 current_page = (g_mem[ADDR_HDD_PAGE] << 24) | (g_mem[ADDR_HDD_PAGE + 1] << 16) | 
+                       (g_mem[ADDR_HDD_PAGE + 2] << 8)  | g_mem[ADDR_HDD_PAGE + 3];
+    u32 hdd_offset = current_page * 512;
+
+    if (hdd_offset + 512 <= HDD_TOTAL_SIZE) {
+        if (hdd_cmd == 1) { // LUKU
+            memcpy(&g_mem[ADDR_HDD_WINDOW], &g_hdd_mem[hdd_offset], 512);
+        } 
+        else if (hdd_cmd == 2) { // TALLENNUS
+            memcpy(&g_hdd_mem[hdd_offset], &g_mem[ADDR_HDD_WINDOW], 512);
+            if (g_hdd_file) {
+                fseek(g_hdd_file, hdd_offset, SEEK_SET);
+                fwrite(&g_hdd_mem[hdd_offset], 1, 512, g_hdd_file);
+                fflush(g_hdd_file);
+            }
+        }
+        // Kuitataan komento
+        g_mem[ADDR_HDD_CMD] = 0;
+        g_mem[ADDR_HDD_CMD + 1] = 0;
+        m68k_set_irq(&g_cpu, 1); 
+    }
+
+    // --- TAVUKORJATTU INTERRUPT-KUITTAUS ---
+    u16 int_clear_val = (g_mem[ADDR_INT_CLEAR] << 8) | g_mem[ADDR_INT_CLEAR + 1];
+    if (int_clear_val == 1) {
+        m68k_set_irq(&g_cpu, 0);
+        g_mem[ADDR_INT_CLEAR] = 0;
+        g_mem[ADDR_INT_CLEAR + 1] = 0;
+    }
+}
+
+
 
 int load_rom_file(const char* filename, u32 dest_addr, u32 max_size) {
     FILE* f = fopen(filename, "rb");
@@ -140,6 +179,7 @@ int main(void) {
     g_mem = calloc(TOTAL_MEM_SIZE, 1);
     if (!g_mem) return 1;
 
+/*
     g_hdd_file = fopen("hdd.img", "rb+");
     if (!g_hdd_file) {
         // Jos tiedostoa ei ole, luodaan tyhjä 10MB virtuaalilevy testejä varten
@@ -157,10 +197,47 @@ int main(void) {
         printf("[HDD] hdd.img liitetty onnistuneesti ohjaimeen.\n");
     }
 
+*/
 
-    // Ladataan molemmat tiedostot ROMs/ kansiosta raakabinääreinä
-    if (!load_rom_file("ROMs\\BIOS.ROM", 0x00000000, 65536)) return 1;
-    if (!load_rom_file("ROMs\\FONT.ROM", ADDR_FONT_ROM, 4096)) return 1; // Tukee max 4KB fontteja
+    FILE* f;
+
+    // 1. Ladataan BIOS.ROM osoitteeseen 0x00000000
+    f = fopen("ROMs\\BIOS.ROM", "rb");
+    if (f) {
+        fread(&g_mem[0x00000000], 1, 20480, f);
+        fclose(f);
+        printf("[EMU] ROMs\\BIOS.ROM esiladattu osoitteeseen 0x00000000.\n");
+    } else {
+        printf("Kriittinen virhe: ROMs\\BIOS.ROM puuttuu!\n");
+        return -1;
+    }
+
+    // 2. Ladataan loader.bin suoraan osoitteeseen 0x00000000 + $5000
+    f = fopen("os_bin\\loader.bin", "rb");
+    if (f) {
+        fread(&g_mem[0x00005000], 1, 512, f);
+        fclose(f);
+        printf("[EMU] os_bin\\loader.bin esiladattu osoitteeseen 0x00005000.\n");
+    }
+
+    // 3. Ladataan monitor.bin suoraan osoitteeseen 0x00000000 + $6000
+    f = fopen("os_bin\\monitor.bin", "rb");
+    if (f) {
+        fread(&g_mem[0x00006000], 1, 4096, f);
+        fclose(f);
+        printf("[EMU] os_bin\\monitor.bin esiladattu osoitteeseen 0x00006000.\n");
+    }
+
+    // 4. Ladataan FONT.ROM osoitteeseen 0x00220000
+    f = fopen("ROMs\\FONT.ROM", "rb");
+    if (f) {
+        fread(&g_mem[0x00220000], 1, 2048, f);
+        fclose(f);
+        printf("[EMU] ROMs\\FONT.ROM esiladattu osoitteeseen 0x00220000.\n");
+    }
+
+
+/*
 
     // Varataan tila ja luetaan koko levy RAMiin
     g_hdd_mem = calloc(HDD_TOTAL_SIZE, 1);
@@ -170,6 +247,7 @@ int main(void) {
         fclose(f_hd);
         printf("[EMU HDD] Koko hdd.img (10MB) ladattu onnistuneesti virtuaalimuistiin.\n");
     }
+*/
 
     m68k_init(&g_cpu, g_mem, TOTAL_MEM_SIZE);
     m68k_reset(&g_cpu);
@@ -218,9 +296,6 @@ int main(void) {
             u32 current_pc = m68k_get_pc(&g_cpu);
             printf("PC: $%08x\n",current_pc);       
 
-        // --- PÄIVITETTY GLOBAALI RAUTAHALT-VAHTI ($0F00 ALUEELLE) ---
-        // Jos PC on saavuttanut uuden GLOBAL_HALTLOOP-alueen ($0F30 - $0F36)
-        // tai jos se on juuttunut virhehaaraan ($11BC - $11C2), sammutetaan kone!
             if ((current_pc >= 0x00000F30 && current_pc <= 0x00000F36)) {
                 
                 printf("\n==================================================================\n");
@@ -233,55 +308,25 @@ int main(void) {
             }
 
 
-        // --- RAUTATASON KESKEYTYSREKISTERIN VAHTIMINEN (INT_CLEAR) ---
-        // Koska keskeytyslinja jätetään pystyyn, tämä laukeaa asynkronisesti juuri oikealla kierroksella!
-        u8 int_clear_val = g_mem[ADDR_INT_CLEAR];
-        if (int_clear_val == 1) { // CPU kirjoitti numero 1 merkiksi hdd-kuittauksesta
-            m68k_set_irq(&g_cpu, 0);   // Lasketaan sähköinen linja alas lennosta
-            g_mem[ADDR_INT_CLEAR] = 0; // Nollataan rekisteri
-            printf("[EMU INT-DEBUG] CPU kuittasi keskeytyksen INT 1 laitteistotasolla. Linja nollattu.\n");
-        }
-
-        // --- MUISTIPEILATTU LEVYOHJAIN + INT 1 ---
-        u32 current_page = (g_mem[ADDR_HDD_PAGE] << 24) | (g_mem[ADDR_HDD_PAGE+1] << 16) | 
-                           (g_mem[ADDR_HDD_PAGE+2] << 8)  | g_mem[ADDR_HDD_PAGE+3];
-        
-        u8 hdd_cmd = g_mem[ADDR_HDD_CMD];
-
-        if (hdd_cmd != 0) {
-            u32 hdd_offset = current_page * 512;
-            if (hdd_offset + 512 <= HDD_TOTAL_SIZE) {
-                
-                if (hdd_cmd == 1) {
-                    memcpy(&g_mem[ADDR_HDD_WINDOW], &g_hdd_mem[hdd_offset], 512);
-                    printf("[EMU HDD] LBA %u luettu ikkunaan. INT 1.\n", current_page);
-                } 
-                else if (hdd_cmd == 2) {
-                    // Korjattu nimi: ADDR_HDD_WINDOW
-                    memcpy(&g_hdd_mem[hdd_offset], &g_mem[ADDR_HDD_WINDOW], 512);
-                    
-                    if (g_hdd_file) {
-                        fseek(g_hdd_file, hdd_offset, SEEK_SET);
-                        fwrite(&g_hdd_mem[hdd_offset], 1, 512, g_hdd_file);
-                        fflush(g_hdd_file);
-                    }
-                    printf("[EMU HDD] LBA %u tallennettu. INT 1.\n", current_page);
-                }
-
-                g_mem[ADDR_HDD_CMD] = 0; 
-                m68k_set_irq(&g_cpu, 1); 
+            // --- RAUTATASON KESKEYTYSREKISTERIN VAHTIMINEN (INT_CLEAR) ---
+            // Koska keskeytyslinja jätetään pystyyn, tämä laukeaa asynkronisesti juuri oikealla kierroksella!
+            u8 int_clear_val = g_mem[ADDR_INT_CLEAR];
+            if (int_clear_val == 1) { // CPU kirjoitti numero 1 merkiksi hdd-kuittauksesta
+                m68k_set_irq(&g_cpu, 0);   // Lasketaan sähköinen linja alas lennosta
+                g_mem[ADDR_INT_CLEAR] = 0; // Nollataan rekisteri
+                printf("[EMU INT-DEBUG] CPU kuittasi keskeytyksen INT 1 laitteistotasolla. Linja nollattu.\n");
             }
-        }
+       
+//        handle_hdd_io();
 
-        // Timer (Level 4) liipaisu
-        timer_counter++;
-        if (timer_counter >= 500) { // Säädetty yhteensopivaksi pienen syklin kanssa
-            m68k_set_irq(&g_cpu, 4);
-            timer_counter = 0;
-        }
+            // Timer (Level 4) liipaisu
+            timer_counter++;
+            if (timer_counter >= 500) { // Säädetty yhteensopivaksi pienen syklin kanssa
+                m68k_set_irq(&g_cpu, 4);
+                timer_counter = 0;
+            }
 
         }
-
 
         Sleep(1); // Pienennetään sleep-aikaa, koska kierroksia ajetaan nyt useammin sekunnissa
     }
