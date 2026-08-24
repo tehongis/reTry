@@ -28,7 +28,7 @@ Start:
     lea     CUSTOM,a6
 	lea		ModuleData,a0
 	moveq.l	#0,d0
-;	jsr		pt_Init
+	jsr		pt_Init
 
 	move.l  EXECBASE,a6
 	jsr     _LVOForbid(a6)
@@ -64,7 +64,7 @@ VBlank_IRQ:
 	movem.l d0-d7/a0-a6,-(sp)    ; Tallenna kaikki rekisterit pinoon turvaan
 
 
-;	jsr		pt_Music
+	jsr		pt_Music
 
 	move.l	FrameCounter,d0
 	and.w	#$4ffe,d0
@@ -398,6 +398,7 @@ Bpl2PtrLo:
 ModuleData:
 	;incbin "scoopex-slideshow.mod"
 	;incbin "testmod.p61"
+	incbin "c:\Users\tehon\Downloads\Update2020\MODS\Protracker\trip_-_horizon.mod"
 	EVEN
 
 	END

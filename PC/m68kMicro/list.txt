@@ -1,0 +1,282 @@
+Sections:
+00: "seg0" (0-8)
+01: "seg1000" (1000-1005)
+02: "seg100" (100-2D6)
+
+
+Source: "bios.asm"
+                            	     1: * =============================================================================
+                            	     2: * Rocket68 BIOS & ROM Monitor (Pienet kirjaimet & Ei välejä pilkun jälkeen)
+                            	     3: * =============================================================================
+                            	     4: 
+                            	     5: * --- LAITTEISTON VAKIOMÄÄRITTELYT (Alkaen sarakkeesta 1) ---
+                            	     6: BEEP_REG    EQU     $001FFFFC           ; Aanilaite (Word: Hz taajuus)
+                            	     7: KEYBOARD    EQU     $001FFFFF           ; Nappaimisto (Byte: b7=Make/Break)
+                            	     8: FB_START    EQU     $00200000           ; Framebufferin alku (320x256, 8-bit)
+                            	     9: PALETTE     EQU     $00214000           ; Palettimuistin alku (256 * RGBQUAD)
+                            	    10: FONT_ROM    EQU     $00220000           ; Toshiba FONT.ROM uusi sijainti RAMissa
+                            	    11: 
+                            	    12:             org     $00000000
+                            	    13: 
+                            	    14: * --- M68k Vektoritaulukko ---
+00:00000000 00080000        	    15:             dc.l    $00080000           ; Initial Stack Pointer (SSP)
+00:00000004 00000100        	    16:             dc.l    START               ; Initial Program Counter (PC)
+                            	    17: 
+                            	    18: * --- Jarjestelmamuuttujat RAM-alueella ---
+                            	    19:             org     $00001000
+01:00001000 00              	    20: CURSOR_X    ds.b    1
+01:00001001 00              	    21: CURSOR_Y    ds.b    1
+01:00001002 00              	    22: BLINK_CTR   ds.b    1
+01:00001003 00              	    23: BLINK_STATE ds.b    1
+01:00001004 00              	    24: LAST_KEY    ds.b    1                   ; Edellisen kierroksen raaka nappaintila
+                            	    25: 
+                            	    26: * --- Jarjestelman kaynnistys ---
+                            	    27:             org     $00000100
+                            	    28: START:
+                            	    29:             ; 1. Alustetaan muuttujat nolliksi
+02:00000100 42381000        	    30:             clr.b   (CURSOR_X)
+02:00000104 42381001        	    31:             clr.b   (CURSOR_Y)
+02:00000108 42381002        	    32:             clr.b   (BLINK_CTR)
+02:0000010C 42381003        	    33:             clr.b   (BLINK_STATE)
+02:00000110 42381004        	    34:             clr.b   (LAST_KEY)
+                            	    35: 
+                            	    36:             ; 2. Alustetaan oletusvarikartta (0=Musta, 1=Valkoinen)
+02:00000114 207C00214000    	    37:             movea.l #PALETTE,a0
+02:0000011A 4298            	    38:             clr.l   (a0)+               ; Index 0: Musta tausta
+02:0000011C 20FC00FFFFFF    	    39:             move.l  #$00FFFFFF,(a0)+   ; Index 1: Valkoinen teksti
+                            	    40: 
+                            	    41:             ; 3. Tyhjennetaan nayttomuisti
+02:00000122 61000096        	    42:             bsr     CLEAR_SCREEN
+                            	    43: 
+                            	    44:             ; 4. Tulostetaan aloituskehote "> " naytolle
+02:00000126 103C003E        	    45:             move.b  #62,d0              ; ASCII '>'
+02:0000012A 610000CC        	    46:             bsr     PRINT_CHAR
+02:0000012E 103C0020        	    47:             move.b  #32,d0              ; ASCII ' '
+02:00000132 610000C4        	    48:             bsr     PRINT_CHAR
+                            	    49: 
+                            	    50: * --- INTERAKTIIVINEN PAASILMUKKA ---
+                            	    51: MAIN_LOOP:
+02:00000136 6100013C        	    52:             bsr     UPDATE_CURSOR
+                            	    53: 
+                            	    54:             ; Luetaan raaka keycode nimea kayttaen
+02:0000013A 1039001FFFFF    	    55:             move.b  (KEYBOARD),d0
+02:00000140 67F4            	    56:             beq     MAIN_LOOP           ; Jos nolla, odotetaan
+                            	    57: 
+02:00000142 B0381004        	    58:             cmp.b   (LAST_KEY),d0
+02:00000146 67EE            	    59:             beq     MAIN_LOOP
+02:00000148 11C01004        	    60:             move.b  d0,(LAST_KEY)
+                            	    61: 
+02:0000014C 08000007        	    62:             btst    #7,d0
+02:00000150 6714            	    63:             beq     .key_released       ; Jos bitti 7 on 0 -> vapautus
+                            	    64: 
+                            	    65:             ; Nappain painettiin alas (Make)! Pyyhitaan tilabitti 7 pois
+02:00000152 0200007F        	    66:             andi.b  #$7F,d0
+02:00000156 6100013A        	    67:             bsr     ERASE_CURSOR
+02:0000015A 6100009C        	    68:             bsr     PRINT_CHAR
+                            	    69: 
+02:0000015E B03C004D        	    70:             cmp.b   #$4D,d0             ; 'M'-nappaimen Virtual-Key arvo
+02:00000162 670E            	    71:             beq     CMD_M
+                            	    72: 
+02:00000164 60D0            	    73:             bra     MAIN_LOOP
+                            	    74: 
+                            	    75: .key_released:
+02:00000166 42381004        	    76:             clr.b   (LAST_KEY)
+02:0000016A 4239001FFFFF    	    77:             clr.b   (KEYBOARD)          ; Siivotaan vayla
+02:00000170 60C4            	    78:             bra     MAIN_LOOP
+                            	    79: 
+                            	    80: * --- MONITORIKOMENTO: M ---
+                            	    81: CMD_M:
+                            	    82:             ; Soitetaan 440 Hz aanimerkki nimea kayttaen
+02:00000172 33FC01B8001FFFFC	    83:             move.w  #440,(BEEP_REG)
+                            	    84: 
+02:0000017A 103C000A        	    85:             move.b  #10,d0              ; Newline (\n)
+02:0000017E 6178            	    86:             bsr     PRINT_CHAR
+02:00000180 103C0052        	    87:             move.b  #82,d0              ; 'R'
+02:00000184 6172            	    88:             bsr     PRINT_CHAR
+02:00000186 103C0041        	    89:             move.b  #65,d0              ; 'A'
+02:0000018A 616C            	    90:             bsr     PRINT_CHAR
+02:0000018C 103C004D        	    91:             move.b  #77,d0              ; 'M'
+02:00000190 6166            	    92:             bsr     PRINT_CHAR
+02:00000192 103C003A        	    93:             move.b  #58,d0              ; ':'
+02:00000196 6160            	    94:             bsr     PRINT_CHAR
+02:00000198 103C0020        	    95:             move.b  #32,d0              ; ' '
+02:0000019C 615A            	    96:             bsr     PRINT_CHAR
+02:0000019E 103C0030        	    97:             move.b  #48,d0              ; '0'
+02:000001A2 6154            	    98:             bsr     PRINT_CHAR
+02:000001A4 103C000A        	    99:             move.b  #10,d0              ; Newline
+02:000001A8 614E            	   100:             bsr     PRINT_CHAR
+02:000001AA 103C003E        	   101:             move.b  #62,d0              ; '>'
+02:000001AE 6148            	   102:             bsr     PRINT_CHAR
+02:000001B0 103C0020        	   103:             move.b  #32,d0              ; ' '
+02:000001B4 6142            	   104:             bsr     PRINT_CHAR
+                            	   105: 
+02:000001B6 6000FF7E        	   106:             bra     MAIN_LOOP
+                            	   107: 
+                            	   108: * --- BIOS ALIRUTIINIT ---
+                            	   109: 
+                            	   110: CLEAR_SCREEN:
+02:000001BA 207C00200000    	   111:             movea.l #FB_START,a0
+02:000001C0 303C4FFF        	   112:             move.w  #20479,d0           ; 320 * 256 / 4 = 20480 pitkaa sanaa - 1
+                            	   113: .clear_loop:
+02:000001C4 4298            	   114:             clr.l   (a0)+
+02:000001C6 51C8FFFC        	   115:             dbra    d0,.clear_loop
+02:000001CA 42381000        	   116:             clr.b   (CURSOR_X)
+02:000001CE 42381001        	   117:             clr.b   (CURSOR_Y)
+02:000001D2 4E75            	   118:             rts
+                            	   119: 
+                            	   120: SCROLL_UP:
+02:000001D4 207C00200000    	   121:             movea.l #FB_START,a0       
+02:000001DA 43E80A00        	   122:             lea     2560(a0),a1         ; 320 * 8 = 2560 tavua alempana
+02:000001DE 303C4D7F        	   123:             move.w  #19839,d0          
+                            	   124: .scroll_loop:
+02:000001E2 20D9            	   125:             move.l  (a1)+,(a0)+
+02:000001E4 51C8FFFC        	   126:             dbra    d0,.scroll_loop
+                            	   127: 
+02:000001E8 303C027F        	   128:             move.w  #639,d0             ; 2560 / 4 - 1
+                            	   129: .fill_blank:
+02:000001EC 4298            	   130:             clr.l   (a0)+
+02:000001EE 51C8FFFC        	   131:             dbra    d0,.fill_blank
+                            	   132: 
+02:000001F2 53381001        	   133:             subq.b  #1,(CURSOR_Y)      
+02:000001F6 4E75            	   134:             rts
+                            	   135: 
+                            	   136: PRINT_CHAR:
+02:000001F8 B03C000A        	   137:             cmp.b   #10,d0              ; Newline check
+02:000001FC 675E            	   138:             beq     .handle_newline
+                            	   139: 
+02:000001FE 0280000000FF    	   140:             andi.l  #$000000FF,d0
+02:00000204 E788            	   141:             lsl.l   #3,d0               ; Kerrotaan 8:lla (CP437 Toshiba-tavuoffset)
+02:00000206 207C00220000    	   142:             movea.l #FONT_ROM,a0
+02:0000020C D1C0            	   143:             adda.l  d0,a0               ; Kohde fontissa
+                            	   144: 
+02:0000020E 7400            	   145:             moveq   #0,d2
+02:00000210 14381001        	   146:             move.b  (CURSOR_Y),d2
+02:00000214 E78A            	   147:             lsl.l   #3,d2               ; Y * 8
+02:00000216 C4FC0140        	   148:             mulu.w  #320,d2             ; Y * 8 * 320
+                            	   149:             
+02:0000021A 7600            	   150:             moveq   #0,d3
+02:0000021C 16381000        	   151:             move.b  (CURSOR_X),d3
+02:00000220 E78B            	   152:             lsl.l   #3,d3               ; X * 8
+                            	   153:             
+02:00000222 227C00200000    	   154:             movea.l #FB_START,a1
+02:00000228 D3C2            	   155:             adda.l  d2,a1
+02:0000022A D3C3            	   156:             adda.l  d3,a1               ; Kohde FB:ssa
+                            	   157: 
+02:0000022C 7807            	   158:             moveq   #7,d4               ; 8 rivia
+                            	   159: .draw_row:
+02:0000022E 1A18            	   160:             move.b  (a0)+,d5           
+02:00000230 7C07            	   161:             moveq   #7,d6               ; 8 bittia
+                            	   162: .draw_col:
+02:00000232 0D05            	   163:             btst    d6,d5
+02:00000234 6706            	   164:             beq     .bg_pixel
+02:00000236 12FC0001        	   165:             move.b  #1,(a1)+            ; Valkoinen pikseli (Indeksi 1)
+02:0000023A 6004            	   166:             bra     .next_pixel
+                            	   167: .bg_pixel:
+02:0000023C 12FC0000        	   168:             move.b  #0,(a1)+            ; Musta pikseli (Indeksi 0)
+                            	   169: .next_pixel:
+02:00000240 51CEFFF0        	   170:             dbra    d6,.draw_col
+02:00000244 43E90138        	   171:             lea     312(a1),a1          ; KORJATTU: Ei valia pilkun jalkeen!
+02:00000248 51CCFFE4        	   172:             dbra    d4,.draw_row
+                            	   173: 
+02:0000024C 52381000        	   174:             addq.b  #1,(CURSOR_X)
+02:00000250 0C3800281000    	   175:             cmp.b   #40,(CURSOR_X)      ; Max 40 saraketta leveyteen
+02:00000256 6D1A            	   176:             blt     .print_done
+02:00000258 42381000        	   177:             clr.b   (CURSOR_X)
+                            	   178: .handle_newline:
+02:0000025C 52381001        	   179:             addq.b  #1,(CURSOR_Y)
+02:00000260 0C3800201001    	   180:             cmp.b   #32,(CURSOR_Y)      ; Max 32 rivia korkeuteen
+02:00000266 6D0A            	   181:             blt     .print_done
+02:00000268 6100FF6A        	   182:             bsr     SCROLL_UP           
+02:0000026C 11FC001F1001    	   183:             move.b  #31,(CURSOR_Y)     
+                            	   184: .print_done:
+02:00000272 4E75            	   185:             rts
+                            	   186: 
+                            	   187: UPDATE_CURSOR:
+02:00000274 52381002        	   188:             addq.b  #1,(BLINK_CTR)
+02:00000278 0C3800191002    	   189:             cmp.b   #25,(BLINK_CTR)    
+02:0000027E 6D0A            	   190:             blt     .cursor_draw
+02:00000280 42381002        	   191:             clr.b   (BLINK_CTR)
+02:00000284 0A3800011003    	   192:             eori.b  #1,(BLINK_STATE)   
+                            	   193: .cursor_draw:
+02:0000028A 1C381003        	   194:             move.b  (BLINK_STATE),d6   
+02:0000028E 6108            	   195:             bsr     RENDER_CURSOR_BLOCK
+02:00000290 4E75            	   196:             rts
+                            	   197: 
+                            	   198: ERASE_CURSOR:
+02:00000292 7C00            	   199:             moveq   #0,d6              
+02:00000294 6102            	   200:             bsr     RENDER_CURSOR_BLOCK
+02:00000296 4E75            	   201:             rts
+                            	   202: 
+                            	   203: RENDER_CURSOR_BLOCK:
+02:00000298 7200            	   204:             moveq   #0,d1
+02:0000029A 12381001        	   205:             move.b  (CURSOR_Y),d1
+02:0000029E E789            	   206:             lsl.l   #3,d1
+02:000002A0 C2FC0140        	   207:             mulu.w  #320,d1
+02:000002A4 7400            	   208:             moveq   #0,d2
+02:000002A6 14381000        	   209:             move.b  (CURSOR_X),d2
+02:000002AA E78A            	   210:             lsl.l   #3,d2
+02:000002AC 227C00200000    	   211:             movea.l #FB_START,a1
+02:000002B2 D3C1            	   212:             adda.l  d1,a1
+02:000002B4 D3C2            	   213:             adda.l  d2,a1
+                            	   214:             
+02:000002B6 7607            	   215:             moveq   #7,d3
+                            	   216: .c_row:
+02:000002B8 7807            	   217:             moveq   #7,d4
+                            	   218: .c_col:
+02:000002BA B67C0006        	   219:             cmp.w   #6,d3
+02:000002BE 6D04            	   220:             blt     .cursor_bg
+02:000002C0 12C6            	   221:             move.b  d6,(a1)+           ; Piirretaan alaviivakursori lennosta
+02:000002C2 6004            	   222:             bra     .cursor_next
+                            	   223: .cursor_bg:
+02:000002C4 12FC0000        	   224:             move.b  #0,(a1)+           
+                            	   225: .cursor_next:
+02:000002C8 51CCFFF0        	   226:             dbra    d4,.c_col
+02:000002CC 43E90138        	   227:             lea     312(a1),a1          ; KORJATTU: Ei valia pilkun jalkeen!
+02:000002D0 51CBFFE6        	   228:             dbra    d3,.c_row
+02:000002D4 4E75            	   229:             rts
+                            	   230:             
+                            	   231:             end
+                            	   232: 
+
+
+Symbols by name:
+BEEP_REG                         E:001FFFFC
+BLINK_CTR                        A:00001002
+BLINK_STATE                      A:00001003
+CLEAR_SCREEN                     A:000001BA
+CMD_M                            A:00000172
+CURSOR_X                         A:00001000
+CURSOR_Y                         A:00001001
+ERASE_CURSOR                     A:00000292
+FB_START                         E:00200000
+FONT_ROM                         E:00220000
+KEYBOARD                         E:001FFFFF
+LAST_KEY                         A:00001004
+MAIN_LOOP                        A:00000136
+PALETTE                          E:00214000
+PRINT_CHAR                       A:000001F8
+RENDER_CURSOR_BLOCK              A:00000298
+SCROLL_UP                        A:000001D4
+START                            A:00000100
+UPDATE_CURSOR                    A:00000274
+
+Symbols by value:
+00000100 START
+00000136 MAIN_LOOP
+00000172 CMD_M
+000001BA CLEAR_SCREEN
+000001D4 SCROLL_UP
+000001F8 PRINT_CHAR
+00000274 UPDATE_CURSOR
+00000292 ERASE_CURSOR
+00000298 RENDER_CURSOR_BLOCK
+00001000 CURSOR_X
+00001001 CURSOR_Y
+00001002 BLINK_CTR
+00001003 BLINK_STATE
+00001004 LAST_KEY
+001FFFFC BEEP_REG
+001FFFFF KEYBOARD
+00200000 FB_START
+00214000 PALETTE
+00220000 FONT_ROM
