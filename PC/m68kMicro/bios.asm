@@ -29,13 +29,13 @@ HDD_STATUS  EQU     $001FFF09
             dc.l    INT_TIMER           ; Level 4 ($70): Ajastin / Kello (Korkein prioriteetti)
 
             org     $00000800
-B_PRINT_CHAR:     jmp     PRINT_CHAR       ; Osoite $00001100
-B_CLEAR_SCREEN:   jmp     CLEAR_SCREEN     ; Osoite $00001104
-B_SCROLL_UP:      jmp     SCROLL_UP        ; Osoite $00001108
-B_SCROLL_DOWN:    jmp     SCROLL_DOWN      ; Osoite $0000110C
-B_HDD_READ:       jmp     HDD_READ_SECTOR  ; Osoite $00001110
-B_HDD_WRITE:      jmp     HDD_WRITE_SECTOR ; Osoite $00001114
-B_PRINT_STR:      jmp     BIOS_PRINT_STR   ; Osoite $00001118
+B_PRINT_CHAR:     jmp     PRINT_CHAR       ; Vakio-osoite: $00000800
+B_CLEAR_SCREEN:   jmp     CLEAR_SCREEN     ; Vakio-osoite: $00000806
+B_SCROLL_UP:      jmp     SCROLL_UP        ; Vakio-osoite: $0000080C
+B_SCROLL_DOWN:    jmp     SCROLL_DOWN      ; Vakio-osoite: $00000812
+B_HDD_READ:       jmp     HDD_READ_SECTOR  ; Vakio-osoite: $00000818
+B_HDD_WRITE:      jmp     HDD_WRITE_SECTOR ; Vakio-osoite: $0000081E
+B_PRINT_STR:      jmp     BIOS_PRINT_STR   ; Vakio-osoite: $00000824
 
             org     $00001000
 BIOS_INIT:
@@ -118,20 +118,18 @@ BOOT_ERROR_IO:
             lea     MSG_ERR_IO,a4
             bsr     BIOS_PRINT_STR
             move.w  #1000,(BEEP_REG)    ; Korkea vikapiip
-
-            jmp     SYSTEM_HALT
+            bra.s   SYSTEM_HALT         ; KORJATTU: Salama-lyhythyppy pysäytykseen
 
 BOOT_ERROR_MAGIC:
             lea     MSG_ERR_SIG,a4
             bsr     BIOS_PRINT_STR
             move.w  #200,(BEEP_REG)     ; Matala virhepiip
-
-            jmp     SYSTEM_HALT
+            bra.s   SYSTEM_HALT         ; KORJATTU: Salama-lyhythyppy pysäytykseen
 
 * --- GLOBAALI HYPPYPAIKKA MUILLE OHJELMILLE ---
 SYSTEM_HALT:
             stop    #$2700
-            bra     *                   ; Pomminvarma suojasilmukka
+            bra.s   *                   ; Pomminvarma suojasilmukka
 
 * =============================================================================
 * BIOS MERKKIJONOTULOSTIN (Apufunktio lokeille)
@@ -379,3 +377,5 @@ BOOT_SECTOR_BUF: ds.b 512
 
             org     $00005000
 EXT_APP_START:
+            
+            end     BIOS_INIT           ; KORJAUS: Ilmoitetaan kääntäjälle aloituspiste!

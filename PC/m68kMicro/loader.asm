@@ -49,8 +49,7 @@ next_entry:
             ; Jos tiedostoa ei löydy
             lea     MSG_NOT_FOUND(pc),a4
             jsr     (B_PRINT_STR)
-            bne     SYSTEM_HALT
-
+            bra.s   SYSTEM_HALT
 
 LOAD_TARGET_FILE:
             move.l  12(a0),d2           ; d2 = Aloitus-LBA levyltä
