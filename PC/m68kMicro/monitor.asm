@@ -186,11 +186,61 @@ CMD_SAVE_SECTOR:
             jsr     (B_PRINT_STR)
             rts
 
-* --- D: DIRECTORY LISTING ---
+
 CMD_DIRECTORY:
-            lea     MSG_DIR_DUMMY,a4
-            jsr     (B_PRINT_STR)
+            movem.l d0-d7/a0-a2,-(sp)   ; Suojataan kaikki rekisterit pinoon
+
+            ; 1. Ladataan kiintolevyn hakemistolohko (LBA 1) väliaikaiseen RAM-puskuriin
+            move.l  #1,d0               ; Sektori LBA = 1
+            movea.l #DIR_LIST_BUF,a0    ; Kohdeosoite RAM-muistissa
+            jsr     (B_HDD_READ)        ; Kutsutaan BIOSin DMA-lukua hyppytaulukosta
+            
+            tst.b   d0                  ; Tarkistetaan palautuskoodi (0 = OK)
+            bne     .dir_hw_error       ; Jos hdd petti, hypätään virheeseen
+
+            ; 2. Käydään läpi hakemiston 16 tiedostoalkiota (32 tavua per alkio)
+            movea.l #DIR_LIST_BUF,a0    ; a0 osoittaa ensimmäiseen alkioon
+            moveq   #15,d7              ; d7 = Silmukan laskuri (16 alkiota, 15->0)
+
+.loop_entries:
+            ; Tarkistetaan onko alkio tyhjä (jos nimen ensimmäinen tavu on $00)
+            tst.b   (a0)
+            beq     .skip_entry         ; Jos tyhjä, hypätään tämän yli
+
+            ; Tulostetaan tiedoston nimi (Tavut 0-11)
+            ; B_PRINT_STR odottaa, että merkkijono päättyy nollaan (\0).
+            ; Koska nimi on kiinteä 12 tavua ilman nollaa, käytetään a0-osoitetta suoraan,
+            ; mutta varmistetaan tulostus tulostamalla merkki kerrallaan tai pakottamalla loppuun \0.
+            ; helpompi tapa: kopioidaan nimi hetkeksi puskuriin ja laitetaan perään \0.
+            lea     TMP_NAME_BUF,a1
+            moveq   #11,d1              ; 12 merkkiä
+.copy_name:
+            move.b  (a0,d1.w),(a1,d1.w)
+            dbra    d1,.copy_name
+            clr.b   12(a1)              ; Pakotetaan nollapääte \0 osoitteeseen +12
+            
+            movea.l #TMP_NAME_BUF,a4    ; a4 = Merkkijono BIOSille
+            jsr     (B_PRINT_STR)       ; Tulostetaan tiedoston nimi ruudulle!
+
+            ; Tulostetaan väli ja ilmoitus koosta
+            lea     MSG_DIR_LINE_END,a4
+            jsr     (B_PRINT_STR)       ; Tulostetaan rivinvaihto \n seuraavaa varten
+
+.skip_entry:
+            adda.l  #32,a0              ; Siirrytään seuraavaan 32-tavuiseen alkioon
+            dbra    d7,.loop_entries
+
+            movem.l (sp)+,d0-d7/a0-a2   ; Palautetaan rekisterit
             rts
+
+.dir_hw_error:
+            lea     MSG_HW_ERROR,a4
+            jsr     (B_PRINT_STR)
+            movem.l (sp)+,d0-d7/a0-a2
+            rts
+
+
+
 
 * --- YHTEISET GLOBAALIT VIRHEPAIKAT ---
 MON_SYNTAX_ERR:
@@ -331,4 +381,10 @@ LAST_TICK:    ds.b    1
 CUR_STATE:    ds.b    1                   
 CMD_BUFFER:   ds.b    32                  
 
+            EVEN
+MSG_DIR_LINE_END: dc.b  10,0            ; Rivinvaihto tiedostojen väliin
+
+            org     $00007500           ; Varataan puskurit turvalliseen paikkaan kaukana koodista
+TMP_NAME_BUF:  ds.b    13               ; Tilaa nimelle + \0
+DIR_LIST_BUF:  ds.b    512              ; 512 tavun väliaikaispuskuri LBA 1:lle
             end     MONITOR_START

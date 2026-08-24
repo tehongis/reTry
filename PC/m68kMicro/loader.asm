@@ -7,14 +7,11 @@
 * --- LIITOKSET BIOS-HYPPYKIRJASTOON ---
 B_HDD_READ      EQU     $00000818           
 B_PRINT_STR     EQU     $00000824           
+B_GLOBAL_HALT   EQU     $00000830           ; UUSI: Järjestelmätason globaali hätäjarru
 
             org     $00005000
 
 LOADER_START:
-            ; Hypätään heti koodin alkuun (vie 2 tai 4 tavua)
-            bra.s   REAL_LBOOT_START
-
-* --- REAALIAIKAINEN LATAUSLOGIIKKA ---
 REAL_LBOOT_START:
             lea     MSG_LOAD_DIR(pc),a4 ; PC-suhteellinen osoitus säästää tilaa
             jsr     (B_PRINT_STR)
@@ -24,7 +21,7 @@ REAL_LBOOT_START:
             lea     DIR_BUF_RAM,a0      ; Puskuri RAMissa (Kaukana koodista)
             jsr     (B_HDD_READ)
             tst.b   d0                  ; 0 = OK
-            bne     SYSTEM_HALT
+            bne     BOOT_ERROR          ; Jos laitevika, hypätään virheeseen
 
             ; 2. Etsitään tiedosto "MONITOR.SYS" hakemistosta
             lea     DIR_BUF_RAM,a0      
@@ -49,7 +46,11 @@ next_entry:
             ; Jos tiedostoa ei löydy
             lea     MSG_NOT_FOUND(pc),a4
             jsr     (B_PRINT_STR)
-            bra.s   SYSTEM_HALT
+            jmp     (B_GLOBAL_HALT)     ; KORJAUS: Suora hyppy BIOSin globaaliin sammutukseen!
+
+BOOT_ERROR:
+            ; --- VIRHE: LAITTEISTOVIKA LEVYLLÄ ---
+            jmp     (B_GLOBAL_HALT)     ; KORJAUS: Suora hyppy BIOSin globaaliin sammutukseen!
 
 LOAD_TARGET_FILE:
             move.l  12(a0),d2           ; d2 = Aloitus-LBA levyltä
@@ -69,16 +70,12 @@ LOAD_SECTORS_LOOP:
             movea.l a2,a0               
             jsr     (B_HDD_READ)
             tst.b   d0
-            bne     SYSTEM_HALT
+            bne.s   BOOT_ERROR
 
             addq.l  #1,d2               
             adda.l  #512,a2             
             subq.l  #1,d3               
             bra     LOAD_SECTORS_LOOP
-
-SYSTEM_HALT:
-            stop    #$2700              ; Aito rautahalt
-            bra.s   SYSTEM_HALT
 
 LAUNCH_SYSTEM:
             jmp     $00006000           ; Käynnistetään Monitori!

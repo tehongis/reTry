@@ -36,6 +36,12 @@ B_SCROLL_DOWN:    jmp     SCROLL_DOWN      ; Vakio-osoite: $00000812
 B_HDD_READ:       jmp     HDD_READ_SECTOR  ; Vakio-osoite: $00000818
 B_HDD_WRITE:      jmp     HDD_WRITE_SECTOR ; Vakio-osoite: $0000081E
 B_PRINT_STR:      jmp     BIOS_PRINT_STR   ; Vakio-osoite: $00000824
+B_GLOBAL_HALT:    jmp     GLOBAL_HALTLOOP  ; Vakio-osoite: $0000082A
+
+            org     $00000ff0
+GLOBAL_HALTLOOP:
+            stop    #$2700              ; Pysäytetään CPU laitteistotasolla
+            bra.s   GLOBAL_HALTLOOP     ; Varmistussilmukka, johon PC lukittuu osoitteeseen $0834
 
             org     $00001000
 BIOS_INIT:
@@ -118,18 +124,13 @@ BOOT_ERROR_IO:
             lea     MSG_ERR_IO,a4
             bsr     BIOS_PRINT_STR
             move.w  #1000,(BEEP_REG)    ; Korkea vikapiip
-            bra.s   SYSTEM_HALT         ; KORJATTU: Salama-lyhythyppy pysäytykseen
+            jmp     GLOBAL_HALTLOOP     ; Hypätään globaaliin sammutukseen
 
 BOOT_ERROR_MAGIC:
             lea     MSG_ERR_SIG,a4
             bsr     BIOS_PRINT_STR
             move.w  #200,(BEEP_REG)     ; Matala virhepiip
-            bra.s   SYSTEM_HALT         ; KORJATTU: Salama-lyhythyppy pysäytykseen
-
-* --- GLOBAALI HYPPYPAIKKA MUILLE OHJELMILLE ---
-SYSTEM_HALT:
-            stop    #$2700
-            bra.s   *                   ; Pomminvarma suojasilmukka
+            jmp     GLOBAL_HALTLOOP     ; Hypätään globaaliin sammutukseen
 
 * =============================================================================
 * BIOS MERKKIJONOTULOSTIN (Apufunktio lokeille)
@@ -210,17 +211,16 @@ KBD_EXIT:
 INT_HDD:
             movem.l d0/a0,-(sp)         ; Suojataan käytettävät rekisterit
             
-            ; LAITTEISTOKUITTAUS: Luetaan HDD_STATUS-rekisteri ($001FFF09).
-            ; Tämä luku laukaisee emulaattorissa m68k_set_irq(0) -funktion, 
-            ; jolloin keskeytyslinja katkeaa fyysisesti ennen kuin poistutaan!
-            move.b  (HDD_STATUS),d0
-            
+            move.b  (HDD_STATUS),d0          
+
             ; Tallennetaan saatu status muuttujaan, josta pääohjelma näkee tuloksen
             move.b  d0,(BIOS_HDD_STATUS_REG)
             
             ; Merkitään operaatio valmiiksi
             move.b  #1,(BIOS_HDD_DONE)
-            
+
+            bset    #1,(INT_CLEAR)      ; Bitti 1 tarkoittaa arvoa %00000010 ($02)
+
             ; Kutsutaan mahdollista sovellustason koukkua
             movea.l (USER_HDD),a0
             cmpa.l  #0,a0
@@ -255,21 +255,15 @@ HDD_COMMON:
             move.l  d0,(HDD_LBA)        ; Asetetaan LBA-lohkosektori
             move.l  a0,(HDD_BUFFER)     ; Asetetaan DMA-osoite muistiin
             
-            ; Alustetaan valmis-lippu suoraan absoluuttisesta osoitteesta
-            move.l  #BIOS_HDD_DONE,a1
-            clr.b   (a1)
-            
-            move.b  d1,(HDD_CMD)        ; Kirjoitetaan komento -> Emulaattori tekee DMA:n ja nostaa IRQ 1:n
+            move.b  #1,(HDD_STATUS)     ; Asetetaan laite tilaan 1 (Busy)
+            move.b  d1,(HDD_CMD)        ; Kirjoitetaan komento -> main.c suorittaa DMA:n lennosta
             
 WAIT_FOR_DMA_1_IRQ:
-            ; Suoritin odottaa tässä silmukassa tyhjää.
-            ; Koska HDD on tasolla 1, korkeamman tason keskeytykset (kuten kello tasolla 4)
-            ; pääsevät vapaasti keskeyttämään tämän odotuksen ilman lukkiutumista.
-            tst.b   (a1)
-            beq     WAIT_FOR_DMA_1_IRQ  ; Pyöritään, kunnes INT_HDD käy muuttamassa tämän 1:ksi
+            ; KORJAUS: Luetaan suoraan laitteen omaa rautarekisteriä ($001FFF09)
+            move.b  (HDD_STATUS),d0
+            cmpi.b  #1,d0               ; Onko ohjain vielä tilassa 1 (Busy)?
+            beq     WAIT_FOR_DMA_1_IRQ  ; Jos on, pyöritään tässä (osoite $11D2)
             
-            ; Kun keskeytys on suoritettu ja linja on nollattu, haetaan saatu tila
-            move.b  (BIOS_HDD_STATUS_REG),d0
             rts
 
 

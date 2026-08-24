@@ -21,6 +21,8 @@
 #define ADDR_HDD_CMD     0x001FFF08
 #define ADDR_HDD_STATUS  0x001FFF09
 
+#define ADDR_INT_CLEAR    0x001FFF0C
+
 FILE* g_hdd_file = NULL;
 
 u8* g_mem = NULL;
@@ -118,11 +120,10 @@ int load_rom_file(const char* filename, u32 dest_addr, u32 max_size) {
 int main(void) {
 
     int timer_counter = 0;
-    int has_booted = 0;      // KORJAUS: Lisätty puuttuva boottilaskuri tähän!
 
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("==================================================================\n");
-    printf("[EMU] Kaynnistetaan M68k alusta uudella FONT.ROM tiedostolla...\n");
+    printf("[EMU] Kaynnistetaan M68k...\n");
     printf("==================================================================\n");
 
     g_mem = calloc(TOTAL_MEM_SIZE, 1);
@@ -190,17 +191,11 @@ int main(void) {
         }
 
         u32 last_pc = m68k_get_pc(&g_cpu);
-        m68k_execute(&g_cpu, 128000);
-        u32 current_pc = m68k_get_pc(&g_cpu);
+        m68k_execute(&g_cpu, 500);
+        u32 current_pc = m68k_get_pc(&g_cpu);        
 
-        // --- KORJATTU TURVALLINEN CPU STOP -KAATUMISVAHTI ---
-        if (has_booted && (current_pc == last_pc)) {
-            printf("\n[EMU HALT] CPU pysaytetty (STOP/HALT-kasky)!\n");
-            dump_cpu_crash_state();
-            running = FALSE;
-        }
+        printf("$%08x\n",current_pc);
 
-        m68k_set_irq(&g_cpu, 0);
 
         // Vahtitaan PC-arvoa turvallisesti sallitun 4MB RAM-muistin rajoissa
         if (m68k_get_pc(&g_cpu) >= TOTAL_MEM_SIZE) {
@@ -209,10 +204,53 @@ int main(void) {
             running = FALSE; 
         }
 
+        // --- UUSI ARKKITEHTUURINEN GLOBAALI HALT-VAHTI ---
+        // Jos PC on saavuttanut kiinteän GLOBAL_HALTLOOP-alueen ($0830 - $0836)
+        if (current_pc >= 0x00000ff0 && current_pc <= 0x00000ff6) {
+            printf("\n==================================================================\n");
+            printf("[EMU HALT] CPU pyysi siistia alasajoa (GLOBAL_HALTLOOP saavutettu)!\n");
+            printf("==================================================================\n");
+            
+            dump_cpu_crash_state(); // Tulostetaan rekisterivedos konsoliin
+            running = FALSE;        // Sammutetaan emulaattorin silmukka siististi
+        }
+
+        // --- RAUTATASON KESKEYTYSREKISTERIN VAHTIMINEN (INT_CLEAR BITMASK) ---
+        u8 int_clear_mask = g_mem[ADDR_INT_CLEAR];
+        if (int_clear_mask != 0) {
+            // Tarkistetaan bitti 1 (HDD / Level 1) -> Maski 0x02
+            if (int_clear_mask & 0x02) {
+                m68k_set_irq(&g_cpu, 1); // Rocket68:ssa linjan nollaus tehdään tarjoamalla tila/arvo 0, 
+                // mutta jos kirjastossasi m68k_set_irq(cpu, 1) asettaa ja jokin muu nollaa,
+                // käytä virallista kuittaustoimintoa. Jos m68k_set_irq(cpu, 0) nollaa KAIKKI, 
+                // muutetaan Rocket68-ytimen linjaa bittikohtaisesti:
+                
+                // HUOMIO: Koska useimmat 68000-ytimet (kuten Musashi) nollaavat linjan komennolla m68k_set_irq(0),
+                // ja jos sinulla on vain yksi globaali nollaus, tehdään se tässä.
+                // Mutta jos Rocket68 tukee erillistä linjan alaslaskua (esim. m68k_set_irq(&g_cpu, 1, 0)), 
+                // käytä sitä. Oletetaan standardi tapa:
+                m68k_set_irq(&g_cpu, 0); 
+                printf("[EMU INT-DEBUG] CPU kuittasi HDD (Level 1) keskeytyksen bittimaskilla.\n");
+            }
+            
+            // Tarkistetaan bitti 2 (Keyboard / Level 2) -> Maski 0x04
+            if (int_clear_mask & 0x04) {
+                printf("[EMU INT-DEBUG] CPU kuittasi Keyboard (Level 2) keskeytyksen bittimaskilla.\n");
+            }
+
+            // Tarkistetaan bitti 4 (Timer / Level 4) -> Maski 0x10
+            if (int_clear_mask & 0x10) {
+                printf("[EMU INT-DEBUG] CPU kuittasi Timer (Level 4) keskeytyksen bittimaskilla.\n");
+            }
+
+            // Pyyhitään käsitellyt bitit pois rekisteristä
+            g_mem[ADDR_INT_CLEAR] &= ~int_clear_mask; 
+        }
+
         // Liipaisualgoritmi Timerille (esim. joka toisella pääsilmukan kierroksella jos Sleep on 16ms, 
         // tai tarkemmin simuloimalla CPU-syklejä. Yksinkertainen tapa:)
         timer_counter++;
-        if (timer_counter >= 1) { // Voit säätää taajuutta tästä
+        if (timer_counter >= 30) { // Voit säätää taajuutta tästä
             m68k_set_irq(&g_cpu, 4); // Nostetaan Level 4 Keskeytys (Timer)
             timer_counter = 0;
         }
@@ -245,17 +283,8 @@ int main(void) {
         
         // NOSTETAAN LEVEL 1 KESKEYTYSPULSSI (IRQ STROBE)
         printf("[EMU IRQ-DEBUG] Nostetaan laitteistokeskeytys: LEVEL 1 IRQ (HDD)\n");
-        m68k_set_irq(&g_cpu, 1); 
-        
-        // Suoritetaan 1-2 pientä askelta/sykliä emulaattorissa, jotta CPU ehtii rekisteröidä linjan nousun
-        m68k_execute(&g_cpu, 10); 
-        
-        // Lasketaan linja heti alas, jottei se jää lukitsemaan suoritinta ikuiseen looppiin (Pulse mode)
-        m68k_set_irq(&g_cpu, 0); 
+        m68k_set_irq(&g_cpu, 1);         
     }
-
-
-        m68k_set_irq(&g_cpu, 3);
 
         u16 frequency = (u16)((g_mem[ADDR_AUDIO_BEEP] << 8) | g_mem[ADDR_AUDIO_BEEP + 1]);
         if (frequency > 0) {
