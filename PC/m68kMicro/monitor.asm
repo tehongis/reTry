@@ -29,7 +29,7 @@ MONITOR_LOOP:
             ; Tehdään toistaiseksi simuloitu "odota D-näppäintä" tai suora suoritus testausta varten,
             ; mutta ajetaan DIR suoraan käynnistyksessä, jotta nähdään sen toimivuus heti livenä!
 
-            jmp     B_GLOBAL_HALT
+            jmp     *   ;B_GLOBAL_HALT
 
             bra.s   CMD_DIRECTORY       ; TESTI: Ajetaan DIR automaattisesti käynnistyksessä!
 

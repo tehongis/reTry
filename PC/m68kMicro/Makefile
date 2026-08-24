@@ -1,5 +1,5 @@
 # =============================================================================
-# Rocket68 Toolchain Makefile (NMAKE / Windows Version)
+# Rocket68 Toolchain Makefile (NMAKE / Windows Version) - FONT FIX
 # =============================================================================
 
 # --- Työkalut ja Kääntäjät ---
@@ -22,14 +22,18 @@ EMU_EXE  = $(BIN_DIR)\rocket68_emu.exe
 BIOS_BIN = $(OS_BIN_DIR)\bios.bin
 LOADER   = $(OS_BIN_DIR)\loader.bin
 MONITOR  = $(OS_BIN_DIR)\monitor.bin
+FONT_BIN = os_bin\font.bin
 HDD_IMG  = hdd.img
+
+# KORJAUS: Määritellään fontille virallinen kohdepolku, jossa emulaattori sitä odottaa
+FONT_ROM = os_bin\FONT.ROM
 
 # =============================================================================
 # PÄÄKOHTEET (Targets)
 # =============================================================================
 
-# Kääntää kaiken ja antaa Python-skriptin rakentaa kovalevyn
-all: setup $(EMU_EXE) $(BIOS_BIN) $(LOADER) $(MONITOR) $(HDD_IMG)
+# KORJAUS: Lisätty $(FONT_ROM) all-kohteen listaan, jotta se rakennetaan aina!
+all: setup $(EMU_EXE) $(BIOS_BIN) $(LOADER) $(MONITOR) $(FONT_BIN) $(HDD_IMG)
 
 # Luodaan kansiot jos niitä ei ole olemassa
 setup:
@@ -48,18 +52,25 @@ $(LOADER): loader.asm
 $(MONITOR): monitor.asm
 	$(ASM68K) -Fbin -o $@ monitor.asm
 
-# KORJAUS: hdd.img on täysin riippuvainen sinun omasta build_indexed_hd.py -skriptistäsi!
+$(FONT_BIN): font.asm
+	@echo [MAKE] Käännetään font.bin tiedostosta font.asm...
+	$(ASM68K) -Fbin -o $@ font.asm
+
+# KORJAUS: Lisätty virallinen sääntö FONT.ROM-tiedostolle.
+# Jos se puuttuu os_bin-kansiosta, etsitään se projektin juuresta tai ROMs-kansiosta ja kopioidaan talteen!
+$(FONT_ROM):
+	@echo [MAKE] Varmistetaan FONT.ROM-tiedoston olemassaolo...
+	@if exist FONT.ROM ( copy /Y FONT.ROM $(OS_BIN_DIR)\FONT.ROM >nul ) \
+	else if exist ROMs\FONT.ROM ( copy /Y ROMs\FONT.ROM $(OS_BIN_DIR)\FONT.ROM >nul ) \
+	else ( echo [VIRHE] Alkuperäistä FONT.ROM tiedostoa ei loytynyt projektista! && exit 1 )
+
 $(HDD_IMG): $(LOADER) $(MONITOR) build_indexed_hd.py
-	@echo [MAKE] Kutsutaan omaa build_indexed_hd.py -skriptia levyn luontiin...
+	@echo [MAKE] Kutsutaan build_indexed_hd.py -skriptia levyn luontiin...
 	$(PYTHON) build_indexed_hd.py
 
-# Käynnistetään emulaattori, Windows luottaa tähän suoraan aiemman Exclusion-säännön ansiosta
 run: all
 	@echo [MAKE] Kaynnistetaan Rocket68-emulaattori...
 	$(EMU_EXE)
-
-
-
 
 # =============================================================================
 # SIIVOUKSET (Clean)
