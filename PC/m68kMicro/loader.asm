@@ -23,25 +23,32 @@ REAL_LBOOT_START:
             tst.b   d0                  ; 0 = OK
             bne     BOOT_ERROR          ; Jos laitevika, hypätään virheeseen
 
-            ; 2. Etsitään tiedosto "MONITOR.SYS" hakemistosta
             lea     DIR_BUF_RAM,a0      
             moveq   #15,d7              ; Max 16 tiedostoa
 
 FIND_FILE_LOOP:
+            ; Otetaan levyn hakemisto-osoite (a0) talteen a2:een,
+            ; koska muuten a0-osoitin siirtyisi vertailussa eteenpäin.
+            movea.l a0,a2               
             lea     FILENAME_TARGET(pc),a1
-            moveq   #10,d1              ; 11 merkkiä
-compare_loop:
-            move.b  (a0,d1.w),d0
-            cmp.b   (a1,d1.w),d0
-            bne     next_entry          
-            dbra    d1,compare_loop
+    
+.compare_loop:
+            move.b  (a1)+,d0            ; Luetaan merkki etsittävästä nimestä, siirretään osoitinta
+            beq.s   .found_null         ; Jos se on 0, ollaan päästy loppuun -> nimi täsmää!
+            
+            cmp.b   (a2)+,d0            ; Verrataan levyltä luettuun merkkiin, siirretään osoitinta
+            bne.s   .next_entry         ; Jos eriäväisyys, hyppää seuraavaan tiedostoon
+            
+            bra.s   .compare_loop       ; Jatkuva silmukka merkeille
 
-            ; Tiedosto löytyi!
+.found_null:
+            ; Jos päästiin tänne, etsittävän nimen kaikki merkit täsmäsivät levyn nimeen!
             bra     LOAD_TARGET_FILE
 
-next_entry:
-            adda.l  #32,a0              
+.next_entry:
+            adda.l  #32,a0             ; Siirrytään seuraavaan aitoon 32 tavun hakemistoalkioon
             dbra    d7,FIND_FILE_LOOP
+
 
             ; Jos tiedostoa ei löydy
             lea     MSG_NOT_FOUND(pc),a4
@@ -82,7 +89,7 @@ LAUNCH_SYSTEM:
 
 * --- DATA JA TEKSTIVAKIOT (Mahtuvat hienosti mukaan) ---
             EVEN
-FILENAME_TARGET: dc.b "MONITOR.SYS "   
+FILENAME_TARGET: dc.b "MONITOR.SYS",0   
 MSG_LOAD_DIR:    dc.b "Reading volume directory...",10,0
 MSG_LOADING_SYS: dc.b "Loading Monitor.sys via index DMA...",10,0
 MSG_NOT_FOUND:   dc.b "Fatal: Monitor.sys not found!",10,0

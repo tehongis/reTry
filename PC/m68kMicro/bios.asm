@@ -10,13 +10,10 @@ FB_START    EQU     $00200000
 PALETTE     EQU     $00214000
 FONT_ROM    EQU     $00220000
 
-HDD_PAGE        EQU     $001FFF00           ; Rekisteri, johon kirjoitetaan LBA (Long)
-HDD_WINDOW      EQU     $001F0000           ; Maaginen 512 tavun ikkuna
-HDD_CMD         EQU     $001FFF08           ; Ohjaimen komentorekisteri (1=Lue, 2=Kirjoita)
-
-
-* --- KESKEYTYSOBJAIMEN REKISTERIT & BITTI-INDEKSIT (bset-käskyä varten) ---
-INT_CLEAR       EQU     $001FFF0C           ; Laitteistotason keskeytyskuittaus [1]
+HDD_PAGE     EQU $001FFF00 ; LBA-sektori (Long)
+HDD_DMA_ADDR EQU $001FFF04 ; DMA Kohde/Lähdeosoite RAMissa (Long)
+HDD_CMD      EQU $001FFF08 ; Komentorekisteri (1=Lue DMA, 2=Kirjoita DMA)
+INT_CLEAR    EQU $001FFF0C ; Keskeytyskuittaus
 
             org     $00000000
 * --- M68k Vektoritaulukko ---
@@ -217,31 +214,13 @@ KBD_EXIT:
             movem.l (sp)+,d0/a0
             rte
 
-* =============================================================================
-* LEVEL 1 INTERRUPT HANDLER (INT_HDD)
-* =============================================================================
 INT_HDD:
-            movem.l d0-d1/a0-a2,-(sp)   ; Suojataan kaikki rekisterit
+            movem.l d0/a0,-(sp)
 
-            ; 1. Haetaan BIOS-muuttujasta se RAM-osoite, jonne käyttäjä halusi tiedot
-            movea.l (BIOS_HDD_TARGET_RAM),a2
-            lea     (HDD_WINDOW),a1     ; Lähde: Maaginen 512B ikkuna
-            
-            ; 2. Kopioidaan 512 tavua ikkunasta kohdemuistiin vauhdilla (128 pitkäsanaa)
-            move.w  #127,d1
-.copy_loop:
-            move.l  (a1)+,(a2)+
-            dbra    d1,.copy_loop
+            move.b  #1,(DMA_READY)      ; Asetetaan valmiusflagi
+            move.w  #1,(INT_CLEAR)      ; Kuittaus emulaattorille
 
-            ; 3. Merkitään operaatio valmiiksi, jotta odotussilmukka katkeaa
-            move.b  #1,(BIOS_HDD_DONE)
-
-            ; 4. LAITTEISTOKUITTAUS (Aivan lopussa): 
-            ; Kerrotaan emulaattorille, että homma on tehty ja INT 1 linja voidaan laskea alas.
-            move.w  #-1,(INT_CLEAR)
-
-            movem.l (sp)+,d0-d1/a0-a2   ; Palautetaan rekisterit
-            rte                         ; Palataan siististi takaisin pääohjelmaan
+            movem.l (sp)+,d0/a0    rte    
 
 INT_TIMER:
             movem.l d0/a0,-(sp)
@@ -258,56 +237,36 @@ NO_TIMER_HOOK:
             movem.l (sp)+,d0/a0
             rte
 
-* =============================================================================
-* PUHDAS MUISTIPEILATTU LEVYLUKU (Memory-Mapped Bank Switching)
-* =============================================================================
 HDD_READ_SECTOR:
-            movem.l d0-d1/a1,-(sp)      ; Suojataan rekisterit
-            move.l  a0,(BIOS_HDD_TARGET_RAM)
-
-            ; 1. Kirjoitetaan komento 1 (LUE) 16-bittisenä Wordina
-            move.w  #1,(HDD_CMD)
+            move.l  d0,-(sp)            ; Suojataan d0 pinon kautta
             
-            ; 2. Kirjoitetaan sivunumero laukaisevaksi tekijäksi
-            move.l  d0,(HDD_PAGE)
+            clr.b   (DMA_READY)         ; Nollataan valmius-flagi
+            move.l  a0,(HDD_DMA_ADDR)   ; Kohdeosoite RAMissa
+            move.l  d0,(HDD_PAGE)       ; Haluttu sektori
+            move.w  #1,(HDD_CMD)        ; Laukaistaan DMA-luku
 
-WAIT_FOR_HDD_INT:
-            ; KORJAUS: Ei testata epäluotettavaa RAM-muuttujaa (a1), 
-            ; vaan luetaan suoraan rautarekisteriä HDD_CMD!
-            move.w  (HDD_CMD),d1        ; Luetaan 16-bittinen komentorekisteri osoitteesta $001FFF08
-            tst.w   d1                  ; Onko se vielä 1 (eli emulaattori käsittelee sitä)?
-            bne.s   WAIT_FOR_HDD_INT    ; Jos on muuta kuin 0, pyöritään tässä osoitteessa $1220
+.wait_dma:
+            tst.b   (DMA_READY)
+            beq.s   .wait_dma           ; Korjattu: Ei ä-kirjainta nimeen
 
-            ; Heti kun emulaattorin handle_hdd_io() teki työn ja nollasi rekisterin, 
-            ; silmukka murtuu livenä samalla mikrosekunnilla!
-
-            movem.l (sp)+,d0-d1/a1
-            moveq   #0,d0               ; d0 = 0 (Success)
+            move.l  (sp)+,d0            ; Palautetaan d0
             rts
 
-
-* =============================================================================
-* INT 1 OHJATTU MUISTIPEILATTU LEVYTALLENNUS (WORD ALIGNED)
-* =============================================================================
 HDD_WRITE_SECTOR:
-            movem.l d0-d1/a1-a2,-(sp)
-            lea     (BIOS_HDD_DONE),a1
-            clr.b   (a1)
-            movea.l a0,a2
-            lea     (HDD_WINDOW),a0
-            move.w  #127,d1
-.copy_to_window:
-            move.l  (a2)+,(a0)+
-            dbra    d1,.copy_to_window
-            ; 3. KORJAUS: Asetetaan komennoksi 2 (KIRJOITA) 16-bittisenä Wordina
-            move.w  #2,(HDD_CMD)
-            move.l  d0,(HDD_PAGE)
-WAIT_FOR_WRITE_INT:
-            tst.b   (a1)
-            beq     WAIT_FOR_WRITE_INT
-            movem.l (sp)+,d0-d1/a1-a2
-            moveq   #0,d0               ; d0 = 0 (Success)
-            rts
+    move.l  d0,-(sp)            ; Suojataan d0 pinon kautta
+    
+    clr.w   (DMA_READY)         ; Nollataan valmius-flagi ennen aloitusta
+    move.l  a0,(HDD_DMA_ADDR)   ; Lähdeosoite RAM-muistissa (mistä kirjoitetaan)
+    move.l  d0,(HDD_PAGE)       ; Kohde-sektori (LBA) kiintolevyllä
+    move.w  #2,(HDD_CMD)        ; Laukaistaan DMA-kirjoitus komennolla 2
+
+.wait_dma_write:
+    tst.w   (DMA_READY)
+    beq.s   .wait_dma_write     ; Odotetaan, kunnes INT_HDD kuittaa siirron valmiiksi
+
+    move.l  (sp)+,d0            ; Palautetaan d0 pinosta
+    moveq   #0,d0              ; Palautetaan 0 (Success) merkiksi onnistumisesta
+    rts
 
 CLEAR_SCREEN:
             movea.l #FB_START,a0
@@ -403,6 +362,9 @@ USER_KBD:     ds.l    1
 USER_HDD:     ds.l    1
 USER_TIMER:   ds.l    1
 SYS_TICKS:    ds.l    1
+
+DMA_READY:   ds.w 1        ; Flagi, joka asetetaan 1 kun keskeytys saapuu
+
 BIOS_KBD_NEW: ds.b    1
 BIOS_KBD_CHAR:ds.b    1
 BIOS_HDD_DONE:ds.b    1
