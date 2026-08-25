@@ -173,6 +173,59 @@ int load_rom_file(const char* filename, u32 dest_addr, u32 max_size) {
     return 1;
 }
 
+void dump_mem(void) {
+        // =============================================================================
+    // ROCKET68 SYSTEEMIDIAGNOSTIIKKA: LOPULLINEN MUISTIDUMPPI (MUKANA PALETTI)
+    // =============================================================================
+    printf("\n==================================================================\n");
+    printf("[EMU DIAG] TULOSTETAAN JÄRJESTELMÄN KRIITTISET MUISTIALUEET LOPETUKSESSA\n");
+    printf("==================================================================\n");
+
+    // Rakenne: { Aloitusosoite, Koko tavuina, Otsikko }
+    struct {
+        u32 start;
+        u32 size;
+        const char* name;
+    } regions[] = {
+        { 0x00000000, 128,   "1. AUTOVECTORIT & EXCEPTION TABLE ($0000-$007F)" },
+        { 0x00001000, 512,   "2. BIOS & JUMP TABLE ($1000-$1200)" },
+        { 0x00005000, 256,   "3. LOADER / BOOTLOADER AREA ($5000-$5100)" },
+        { 0x00200000, 512,   "4. RUUTUMUISTI / FRAMEBUFFER ALKU ($00200000-)" },
+        { 0x00220000, 256,   "5. FONT ROM GLYYFIT ($00220000-)" },
+        { 0x001FFF40, 64,    "6. PALETTE RAM REKISTERIT ($001FFF40-)" } // UUSI LOHKO
+    };
+
+    int num_regions = sizeof(regions) / sizeof(regions[0]);
+
+    for (int r = 0; r < num_regions; r++) {
+        printf("\n--- %s ---\n", regions[r].name);
+        
+        for (u32 addr = regions[r].start; addr < regions[r].start + regions[r].size; addr += 16) {
+            printf("$%08X: ", addr);
+            
+            // Hex-tavut
+            for (int i = 0; i < 16; i++) {
+                printf("%02X ", g_mem[addr + i]);
+            }
+            printf(" | ");
+            
+            // Luettavat ASCII-merkit
+            for (int i = 0; i < 16; i++) {
+                u8 ch = g_mem[addr + i];
+                if (ch >= 32 && ch <= 126) {
+                    printf("%c", ch);
+                } else {
+                    printf(".");
+                }
+            }
+            printf("\n");
+        }
+    }
+    printf("==================================================================\n\n");
+
+    return;
+}
+
 int main(void) {
 
     int timer_counter = 0;
@@ -287,24 +340,6 @@ int main(void) {
     printf("[EMU] Kaynnistetaan M68k...\n");
     printf("==================================================================\n");
 
-/*
-    // =============================================================================
-    // ROCKET68 DIAGNOSTIIKKA: MUISTIN ALUN HEX-DUMPPEJA (0 - 2048 tavua)
-    // =============================================================================
-    printf("\n==================================================================\n");
-    printf("[EMU DIAG] Tulostetaan muistin $0000-$2000 KB :\n");
-    printf("==================================================================\n");
-    
-    for (u32 addr = 0; addr < 0x800; addr += 32) {
-        printf("$%08X: ", addr);
-        // Tulostetaan 16 tavua hexana
-        for (int i = 0; i < 32; i++) {
-            printf("%02X ", g_mem[addr + i]);
-        }
-        printf("\n");
-    }
-    printf("==================================================================\n\n");
-*/
     running = TRUE;
     while (running) {
         while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -316,7 +351,7 @@ int main(void) {
         u32 last_pc = m68k_get_pc(&g_cpu);
         m68k_execute(&g_cpu, 4096);
         u32 current_pc = m68k_get_pc(&g_cpu);
-        //printf("CPU stepped from $%08x to $%08x \n",last_pc,current_pc);
+        printf("CPU stepped from $%08x to $%08x \n",last_pc,current_pc);
 
         handle_hdd_io();
 
@@ -348,11 +383,13 @@ int main(void) {
         }
 
         if (running==FALSE) {
+            dump_mem(void);
             dump_cpu_crash_state();
         }
 
         Sleep(4); // Pienennetään sleep-aikaa, koska kierroksia ajetaan nyt useammin sekunnissa
     }
+
 
     free(g_mem);
 
