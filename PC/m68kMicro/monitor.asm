@@ -3,16 +3,19 @@
 * =============================================================================
 * Loader lataa tämän ja hyppää osoitteeseen $00006000.
 
-* BIOS V3.0 - VIRALLISET RAJAPINTAOSOITTEET (JUMP TABLE OFFSETS)
-B_INIT          EQU     $00001000   ; BIOS Alustusrutiini (Cold Boot)
-B_PRINT_CHAR    EQU     $00001006   ; Tulostaa yhden ASCII-merkin (D0=char, D1=X, D2=Y)
-B_CLEAR_SCREEN  EQU     $0000100C   ; Tyhjentää ruudun paletin värillä 0 (Musta)
-B_SCROLL_UP     EQU     $00001012   ; Skrollaa ruutua yhden tekstirivin verran ylöspäin
-B_SCROLL_DOWN   EQU     $00001018   ; Skrollaa ruutua yhden tekstirivin verran alaspäin
-B_HDD_READ      EQU     $0000101E   ; DMA-lukulohko (D0=LBA, A0=Kohde-RAM)
-B_HDD_WRITE     EQU     $00001024   ; DMA-kirjoituslohko (D0=LBA, A0=Lähde-RAM)
-B_PRINT_STR     EQU     $0000102A   ; Tulostaa nollatavuun päättyvän lokijonon (A4=Osoite)
-B_GLOBAL_HALT   EQU     $00001030   ; Pysäyttää suorittimen laitteistotasolla (Panic)
+* =============================================================================
+* ROCKET68 BIOS V3.0 - VIRALLISET RAJAPINTAOSOITTEET (JUMP TABLE OFFSETS)
+* =============================================================================
+B_INIT          EQU     $00001000   ; 6 tavua -> Seuraava: $1006 (Cold Boot)
+B_PRINT_CHAR    EQU     $00001006   ; 6 tavua -> Seuraava: $100C (Tulosta ASCII)
+B_CLEAR_SCREEN  EQU     $0000100C   ; 6 tavua -> Seuraava: $1012 (Tyhjennä ruutu)
+B_SCROLL_UP     EQU     $00001012   ; 6 tavua -> Seuraava: $1018 (Skrollaa ylös)
+B_SCROLL_DOWN   EQU     $00001018   ; 6 tavua -> Seuraava: $101E (Skrollaa alas)
+B_HDD_READ      EQU     $0000101E   ; 6 tavua -> Seuraava: $1024 (DMA-levyluku)
+B_HDD_WRITE     EQU     $00001024   ; 6 tavua -> Seuraava: $102A (DMA-levykirjoitus)
+B_PRINT_STR     EQU     $0000102A   ; 6 tavua -> Seuraava: $1030 (Tulosta stringi)
+B_GLOBAL_HALT   EQU     $00001030   ; 6 tavua -> Seuraava: $1036 (Hätäjarrutus)
+
 
 HDD_WINDOW      EQU     $001F0000           ; Maagisen muisti-ikkunan aloitusosoite
 

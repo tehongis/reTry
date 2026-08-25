@@ -1,0 +1,42 @@
+
+1. **Memory Management:**
+   - Memory allocation and deallocation
+   - Memory creation and destruction
+   - Memory organization
+
+2. **Input/Output (I/O) Operations:**
+   - Keyboard input handling
+   - Mouse input handling
+   - Audio device handling
+
+3. **Timer Management:**
+   - Timer initialization and management
+   - Interrupt handling
+
+4. **Data Handling:**
+   - Reading from and writing to memory
+   - Memory copy and conversion
+
+5. **Context Switching:**
+   - CPU context switching
+   - Task management
+
+6. **System Functions:**
+   - System reset
+   - Power on/off
+
+7. **Radio Operations:**
+   - Radio communication
+   - Radio management
+
+8. **Framebuffer Operations:**
+   - Framebuffer clear
+   - Color setting
+   - Bitmap character handling
+   - Cursor handling
+   - Scrolling
+
+9. **Block Device Operations:**
+   - Reading from block device (HDD)
+   - Writing to block device (HDD)
+   - Block device management

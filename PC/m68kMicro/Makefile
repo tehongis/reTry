@@ -40,9 +40,9 @@ setup:
 	@if not exist $(BIN_DIR) mkdir $(BIN_DIR)
 	@if not exist $(OS_BIN_DIR) mkdir $(OS_BIN_DIR)
 
-$(EMU_EXE): main.c
+$(EMU_EXE): main.c window.c utils.c
 	$(CC) $(CFLAGS) main.c $(LIB_DIR)\librocket68.lib /Fe$@ /link user32.lib kernel32.lib gdi32.lib /DEBUG /MANIFEST
-
+ 
 $(BIOS_BIN): bios.asm
 	$(ASM68K) -spaces -Fbin -o $@ bios.asm
 

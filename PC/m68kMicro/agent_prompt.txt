@@ -1,0 +1,8 @@
+C:\Users\tehon\GitHub\reTry\PC\m68kMicro\include\m68k.h(179): warning C4324: 'M68kCpu': structure was padded due to alignment specifier
+main.c(60): warning C4100: 'wc': unreferenced parameter
+main.c(179): warning C4013: 'dump_cpu_crash_state' undefined; assuming extern returning int
+main.c(198): warning C4013: 'dump_mem' undefined; assuming extern returning int
+main.c(208): warning C4101: 'statusText': unreferenced local variable
+main.obj : error LNK2019: unresolved external symbol WndProc referenced in function register_window_class
+main.obj : error LNK2019: unresolved external symbol dump_cpu_crash_state referenced in function main_loop
+main.obj : error LNK2019: unresolved external symbol dump_mem referenced in function main_loop
