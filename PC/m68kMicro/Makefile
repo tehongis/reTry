@@ -44,7 +44,7 @@ $(EMU_EXE): main.c
 	$(CC) $(CFLAGS) main.c $(LIB_DIR)\librocket68.lib /Fe$@ /link user32.lib kernel32.lib gdi32.lib /DEBUG /MANIFEST
 
 $(BIOS_BIN): bios.asm
-	$(ASM68K) -Fbin -o $@ bios.asm
+	$(ASM68K) -spaces -Fbin -o $@ bios.asm
 
 $(LOADER): loader.asm
 	$(ASM68K) -Fbin -o $@ loader.asm

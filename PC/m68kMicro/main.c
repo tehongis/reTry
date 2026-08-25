@@ -190,17 +190,16 @@ int illegal_instruction_callback(int opcode) {
 }
 
 void handle_hdd_io(void) {
-    // 1. Tarkistetaan komentorekisteri (16-bit)
-    u16 hdd_cmd = (g_mem[ADDR_HDD_CMD] << 8) | g_mem[ADDR_HDD_CMD + 1];
+    u8 hdd_cmd = g_mem[ADDR_HDD_CMD];
     if (hdd_cmd == 0) return;
 
-    // 2. Haetaan haluttu LBA-sektori (32-bit)
+    // Haetaan sektori (LBA, 32-bit)
     u32 current_page = (g_mem[ADDR_HDD_PAGE]     << 24) | 
                        (g_mem[ADDR_HDD_PAGE + 1] << 16) |
                        (g_mem[ADDR_HDD_PAGE + 2] << 8)  | 
                         g_mem[ADDR_HDD_PAGE + 3];
 
-    // 3. Haetaan DMA-kohdeosoite (32-bit)
+    // Haetaan DMA-kohdeosoite (32-bit)
     u32 dma_addr = (g_mem[ADDR_HDD_DMA_ADDR]     << 24) | 
                    (g_mem[ADDR_HDD_DMA_ADDR + 1] << 16) |
                    (g_mem[ADDR_HDD_DMA_ADDR + 2] << 8)  | 
@@ -212,26 +211,20 @@ void handle_hdd_io(void) {
         fseek(g_hdd_file, hdd_offset, SEEK_SET);
 
         if (hdd_cmd == 1) {
-            // Suora siirto tiedostosta virtuaalisen m68k:n RAMiin
-            SendMessage(g_hwndStatus, SB_SETTEXTA, 2, (LPARAM)(g_hdd_activity ? "  HDD: [ BUSY ] 🔴" : "  HDD: [ IDLE ] ⚪"));
+            // Luku: Tiedostosta suoraan M68k:n RAMiin [0x01.32, 0x01.52]
             fread(&g_mem[dma_addr], 1, 512, g_hdd_file);
         } 
         else if (hdd_cmd == 2) {
-            // Suora siirto m68k:n RAMista tiedostoon
-            SendMessage(g_hwndStatus, SB_SETTEXTA, 2, (LPARAM)(g_hdd_activity ? "  HDD: [ BUSY ] 🔴" : "  HDD: [ IDLE ] ⚪"));
+            // Kirjoitus: M68k:n RAMista tiedostoon [0x01.32]
             fwrite(&g_mem[dma_addr], 1, 512, g_hdd_file);
             fflush(g_hdd_file);
         }
-
-        // --- UUSI KESKEYTYSLAUKAISU ---
-        // Nollataan komento heti laitteiston puolesta
-        g_mem[ADDR_HDD_CMD] = 0;
-        g_mem[ADDR_HDD_CMD + 1] = 0;
-
-        // Nostetaan Level 1 keskeytys merkiksi siitä, että DMA on valmis!
-        m68k_set_irq(&g_cpu, 1);
     }
+
+    // KORJAUS: Nollataan komento. Tämä katkaisee bios.asm:n odotussilmukan välittömästi [0x01.32, 0x01.52]!
+    g_mem[ADDR_HDD_CMD] = 0; 
 }
+
 
 int load_rom_file(const char* filename, u32 dest_addr, u32 max_size) {
     FILE* f = fopen(filename, "rb");
@@ -433,7 +426,12 @@ int main(void) {
 
         InvalidateRect(g_hwnd, NULL, FALSE);
 
-        handle_hdd_io();
+        u8 hdd_cmd = g_mem[ADDR_HDD_CMD]; 
+
+        if (hdd_cmd != 0) {
+            handle_hdd_io();
+            g_hdd_activity = TRUE;
+        }
 
         if ((current_pc >= 0x000012CE && current_pc <= 0x000012D2)){
             
@@ -446,14 +444,15 @@ int main(void) {
             break;
         }
 
-        // --- RAUTATASON KESKEYTYSREKISTERIN VAHTIMINEN (INT_CLEAR) ---
-        // Koska keskeytyslinja jätetään pystyyn, tämä laukeaa asynkronisesti juuri oikealla kierroksella!
+        // Keskeytyskuittaus suoraan yhdellä tavulla! [0x01.32]
         u8 int_clear_val = g_mem[ADDR_INT_CLEAR];
-        if (int_clear_val != 0) { // CPU kirjoitti hdd-kuittauksen
-            m68k_set_irq(&g_cpu, 0);   // Lasketaan sähköinen linja alas lennosta
-            g_mem[ADDR_INT_CLEAR] = 0; // Nollataan rekisteri
+        if (int_clear_val != 0) {
+            m68k_set_irq(&g_cpu, 0); // Lasketaan IRQ-linja alas
+            g_mem[ADDR_INT_CLEAR] = 0; // Nollataan kuittausrekisteri
             printf("[EMU INT-DEBUG] CPU kuittasi keskeytyksen INT 1 laitteistotasolla. Linja nollattu.\n");
         }
+ 
+ 
     
         // Timer (Level 4) liipaisu
         timer_counter++;

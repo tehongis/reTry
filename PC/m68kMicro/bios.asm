@@ -57,7 +57,7 @@ B_GLOBAL_HALT:    jmp     GLOBAL_HALT
 BIOS_INIT:
 
             move.w  #$2700,sr
-            
+
             ; Nollataan järjestelmän muuttujat
             clr.l   (USER_VBLANK)
             clr.l   (USER_KBD)
@@ -197,7 +197,7 @@ INT_VBLANK:
             jsr     (a0)
 NO_VBL_HOOK:
 
-            move.w  #1,(INT_CLEAR)  
+            move.b  #1,(INT_CLEAR)  
 
             movem.l (sp)+,d0/a0
             rte
@@ -223,7 +223,7 @@ INT_KEYBOARD:
 KEY_RELEASED:
             clr.b   (KEYBOARD)
 KBD_EXIT:
-            move.w  #1,(INT_CLEAR)  
+            move.b  #1,(INT_CLEAR)  
 
             movem.l (sp)+,d0/a0
             rte
@@ -232,7 +232,7 @@ INT_HDD:
             movem.l d0/a0,-(sp)
 
             move.b  #1,(DMA_READY)      ; Asetetaan valmiusflagi
-            move.w  #1,(INT_CLEAR)      ; Kuittaus emulaattorille
+            move.b  #1,(INT_CLEAR)      ; Kuittaus emulaattorille
 
             movem.l (sp)+,d0/a0    rte    
 
@@ -246,40 +246,42 @@ INT_TIMER:
             jsr     (a0)
 NO_TIMER_HOOK:
 
-            move.w  #-1,(INT_CLEAR)  
+            move.b  #-1,(INT_CLEAR)  
 
             movem.l (sp)+,d0/a0
             rte
 
 HDD_READ_SECTOR:
-            move.l  d0,-(sp)            ; Suojataan d0 pinon kautta
-            
-            clr.b   (DMA_READY)         ; Nollataan valmius-flagi
-            move.l  a0,(HDD_DMA_ADDR)   ; Kohdeosoite RAMissa
-            move.l  d0,(HDD_PAGE)       ; Haluttu sektori
-            move.w  #1,(HDD_CMD)        ; Laukaistaan DMA-luku
+    move.l  d0,-(sp)
+    
+    move.l  a0,(HDD_DMA_ADDR)   ; Kerrotaan kohdeosoite RAMissa
+    move.l  d0,(HDD_PAGE)       ; Asetetaan LBA-sektori
+    move.b  #1,(HDD_CMD)        ; Laukaistaan DMA-luku (tavu 1)
 
 .wait_dma:
-            tst.b   (DMA_READY)
-            beq.s   .wait_dma           ; Korjattu: Ei ä-kirjainta nimeen
+    ; Luetaan suoraan laiterekisteriä HDD_CMD ($001FFF08) [0x01.52]!
+    move.b  (HDD_CMD), d1
+    tst.b   d1                  ; Onko se vielä 1 (eli emulaattori käsittelee)? [0x01.52]
+    bne.s   .wait_dma           ; Jos on muuta kuin 0, odotetaan [0x01.52]
 
-            move.l  (sp)+,d0            ; Palautetaan d0
-            rts
+    move.l  (sp)+,d0
+    rts
 
+* --- PUHDAS JA DYNAAMINEN LEVYTALLENNUS ---
 HDD_WRITE_SECTOR:
-    move.l  d0,-(sp)            ; Suojataan d0 pinon kautta
+    move.l  d0,-(sp)
     
-    clr.w   (DMA_READY)         ; Nollataan valmius-flagi ennen aloitusta
-    move.l  a0,(HDD_DMA_ADDR)   ; Lähdeosoite RAM-muistissa (mistä kirjoitetaan)
-    move.l  d0,(HDD_PAGE)       ; Kohde-sektori (LBA) kiintolevyllä
-    move.w  #2,(HDD_CMD)        ; Laukaistaan DMA-kirjoitus komennolla 2
+    move.l  a0,(HDD_DMA_ADDR)   ; Lähdeosoite RAMissa
+    move.l  d0,(HDD_PAGE)       ; Kohde LBA-sektori
+    move.b  #2,(HDD_CMD)        ; Laukaistaan DMA-kirjoitus (tavu 2)
 
 .wait_dma_write:
-    tst.w   (DMA_READY)
-    beq.s   .wait_dma_write     ; Odotetaan, kunnes INT_HDD kuittaa siirron valmiiksi
+    move.b  (HDD_CMD), d1
+    tst.b   d1
+    bne.s   .wait_dma_write
 
-    move.l  (sp)+,d0            ; Palautetaan d0 pinosta
-    moveq   #0,d0              ; Palautetaan 0 (Success) merkiksi onnistumisesta
+    move.l  (sp)+,d0
+    moveq   #0, d0              ; Success
     rts
 
 CLEAR_SCREEN:
@@ -365,14 +367,14 @@ USER_HDD:     ds.l    1
 USER_TIMER:   ds.l    1
 SYS_TICKS:    ds.l    1
 
-DMA_READY:   ds.w 1        ; Flagi, joka asetetaan 1 kun keskeytys saapuu
-
 BIOS_KBD_NEW: ds.b    1
 BIOS_KBD_CHAR:ds.b    1
 BIOS_HDD_DONE:ds.b    1
 BIOS_HDD_STATUS_REG: ds.b 1             ; UUSI: Tila keskeytyksestä palautettavalle statukselle
 L_CUR_X:      ds.b    1                  ; BIOS-lokin oma X-kursori
 L_CUR_Y:      ds.b    1                  ; BIOS-lokin oma Y-kursori
+
+DMA_READY:   ds.b 1        ; Flagi, joka asetetaan 1 kun keskeytys saapuu
 
 BOOT_SECTOR_BUF: ds.b 512
 
