@@ -27,22 +27,18 @@ INT_CLEAR    EQU $001FFF0C ; Keskeytyskuittaus
             dc.l    INT_VBLANK          ; Level 3 ($6C): VBLANK
             dc.l    INT_TIMER           ; Level 4 ($70): Ajastin / Kello (Korkein prioriteetti)
 
-            org     $00000800
-B_PRINT_CHAR:     jmp     PRINT_CHAR       ; Vakio-osoite: $00000800
-B_CLEAR_SCREEN:   jmp     CLEAR_SCREEN     ; Vakio-osoite: $00000806
-B_SCROLL_UP:      jmp     SCROLL_UP        ; Vakio-osoite: $0000080C
-B_SCROLL_DOWN:    jmp     SCROLL_DOWN      ; Vakio-osoite: $00000812
-B_HDD_READ:       jmp     HDD_READ_SECTOR  ; Vakio-osoite: $00000818
-B_HDD_WRITE:      jmp     HDD_WRITE_SECTOR ; Vakio-osoite: $0000081E
-B_PRINT_STR:      jmp     BIOS_PRINT_STR   ; Vakio-osoite: $00000824
-B_GLOBAL_HALT:    jmp     GLOBAL_HALTLOOP  ; Vakio-osoite: $0000082A
-
-            org     $00000ff0
-GLOBAL_HALTLOOP:
-            stop    #$2700              ; Pysäytetään CPU laitteistotasolla
-            bra.s   GLOBAL_HALTLOOP     ; Varmistussilmukka, johon PC lukittuu osoitteeseen $0834
-
             org     $00001000
+
+B_INIT:           jmp     BIOS_INIT
+B_PRINT_CHAR:     jmp     PRINT_CHAR
+B_CLEAR_SCREEN:   jmp     CLEAR_SCREEN
+B_SCROLL_UP:      jmp     SCROLL_UP
+B_SCROLL_DOWN:    jmp     SCROLL_DOWN
+B_HDD_READ:       jmp     HDD_READ_SECTOR
+B_HDD_WRITE:      jmp     HDD_WRITE_SECTOR
+B_PRINT_STR:      jmp     BIOS_PRINT_STR
+B_GLOBAL_HALT:    jmp     GLOBAL_HALT    
+
 BIOS_INIT:
             ; Nollataan järjestelmän muuttujat
             clr.l   (USER_VBLANK)
@@ -123,13 +119,13 @@ BOOT_ERROR_IO:
             lea     MSG_ERR_IO,a4
             bsr     BIOS_PRINT_STR
             move.w  #1000,(BEEP_REG)    ; Korkea vikapiip
-            jmp     GLOBAL_HALTLOOP     ; Hypätään globaaliin sammutukseen
+            jmp     GLOBAL_HALT           ; Hypätään globaaliin sammutukseen
 
 BOOT_ERROR_MAGIC:
             lea     MSG_ERR_SIG,a4
             bsr     BIOS_PRINT_STR
             move.w  #200,(BEEP_REG)     ; Matala virhepiip
-            jmp     GLOBAL_HALTLOOP     ; Hypätään globaaliin sammutukseen
+            jmp     GLOBAL_HALT           ; Hypätään globaaliin sammutukseen
 
 * =============================================================================
 * BIOS MERKKIJONOTULOSTIN (Apufunktio lokeille)
@@ -340,22 +336,6 @@ NEXT_PIXEL:
 * LOOKUP-TAULUKOT, MERKKIJONOT JA RAM-MUUTTUJAT
 * =============================================================================
             EVEN
-MSG_WELCOME:  dc.b  "Rocket68 Bios V3.0 - Initializing...",10,0
-MSG_HDD_INIT: dc.b  "Accessing virtual HDD (LBA 0)...",10,0
-MSG_CHECK_SIG:dc.b  "Checking boot signature...",10,0
-MSG_BOOT_OK:  dc.b  "Success: Launching loader.exe...",10,0
-MSG_ERR_IO:   dc.b  "Fatal: HDD read error!",10,0
-MSG_ERR_SIG:  dc.b  "Fatal: No bootable signature found!",10,0
-MSG_DIRECT_BOOT: dc.b "Esiladattu RAM-kayttojarjestelma havaittu. Kaynnistetaan Monitori...",10,0
-            EVEN
-SCANCODE_LUT:
-            dc.b    0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 8, 9
-            dc.b    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', $0D, 0, 'A', 'S'
-            dc.b    'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', $27, '`', 0, $5C, 'Z', 'X', 'C', 'V'
-            dc.b    'B', 'N', 'M', ',', '.', '/', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0
-
-            org     $00004000
-            EVEN
 BIOS_HDD_TARGET_RAM:  ds.l    1             ; Varataan 4 tavua (Long) kohdemuistiosoitteelle
 USER_VBLANK:  ds.l    1
 USER_KBD:     ds.l    1
@@ -371,7 +351,28 @@ BIOS_HDD_DONE:ds.b    1
 BIOS_HDD_STATUS_REG: ds.b 1             ; UUSI: Tila keskeytyksestä palautettavalle statukselle
 L_CUR_X:      ds.b    1                  ; BIOS-lokin oma X-kursori
 L_CUR_Y:      ds.b    1                  ; BIOS-lokin oma Y-kursori
+
 BOOT_SECTOR_BUF: ds.b 512
+
+            EVEN
+MSG_WELCOME:  dc.b  "Rocket68 Bios V3.0 - Initializing...",10,0
+MSG_HDD_INIT: dc.b  "Accessing virtual HDD (LBA 0)...",10,0
+MSG_CHECK_SIG:dc.b  "Checking boot signature...",10,0
+MSG_BOOT_OK:  dc.b  "Success: Launching loader.exe...",10,0
+MSG_ERR_IO:   dc.b  "Fatal: HDD read error!",10,0
+MSG_ERR_SIG:  dc.b  "Fatal: No bootable signature found!",10,0
+MSG_DIRECT_BOOT: dc.b "Esiladattu RAM-kayttojarjestelma havaittu. Kaynnistetaan Monitori...",10,0
+            EVEN
+SCANCODE_LUT:
+            dc.b    0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 8, 9
+            dc.b    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', $0D, 0, 'A', 'S'
+            dc.b    'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', $27, '`', 0, $5C, 'Z', 'X', 'C', 'V'
+            dc.b    'B', 'N', 'M', ',', '.', '/', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0
+
+            org     $00004ff0
+GLOBAL_HALT:
+.HALTLOOP         stop    #$2700
+                  bra.s   .HALTLOOP
 
             org     $00005000
 EXT_APP_START:
