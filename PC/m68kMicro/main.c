@@ -224,19 +224,23 @@ int main(void) {
     if (f) {
         fread(&g_mem[0x00000000], 1, 20480, f);
         fclose(f);
-        printf("[EMU] os_bin\\BIOS.ROM esiladattu osoitteeseen 0x00000000.\n");
+        printf("[EMU] os_bin\\bios.bin esiladattu osoitteeseen 0x00000000.\n");
     } else {
-        printf("Kriittinen virhe: os_bin\\BIOS.ROM puuttuu!\n");
+        printf("Kriittinen virhe: os_bin\\bios.bin puuttuu!\n");
         return -1;
     }
-
+/*
     // 2. Ladataan loader.bin suoraan osoitteeseen 0x00000000 + $5000
     f = fopen("os_bin\\loader.bin", "rb");
     if (f) {
         fread(&g_mem[0x00005000], 1, 512, f);
         fclose(f);
         printf("[EMU] os_bin\\loader.bin esiladattu osoitteeseen 0x00005000.\n");
+    } else {
+        printf("Kriittinen virhe: os_bin\\loader.bin puuttuu!\n");
+        return -1;
     }
+
 
     // 3. Ladataan monitor.bin suoraan osoitteeseen 0x00000000 + $6000
     f = fopen("os_bin\\monitor.bin", "rb");
@@ -244,14 +248,21 @@ int main(void) {
         fread(&g_mem[0x00006000], 1, 4096, f);
         fclose(f);
         printf("[EMU] os_bin\\monitor.bin esiladattu osoitteeseen 0x00006000.\n");
+    } else {
+        printf("Kriittinen virhe: os_bin\\monitor.bin puuttuu!\n");
+        return -1;
     }
 
+*/
     // 4. Ladataan FONT.ROM osoitteeseen 0x00220000
     f = fopen("os_bin\\font.bin", "rb");
     if (f) {
         fread(&g_mem[0x00220000], 1, 2048, f);
         fclose(f);
         printf("[EMU] os_bin\\font.bin esiladattu osoitteeseen 0x00220000.\n");
+    } else {
+        printf("Kriittinen virhe: os_bin\\font.bin puuttuu!\n");
+        return -1;
     }
 
     // Varataan tila ja luetaan koko levy RAMiin
@@ -262,7 +273,6 @@ int main(void) {
         fclose(f_hd);
         printf("[EMU HDD] Koko hdd.img (10MB) ladattu onnistuneesti virtuaalimuistiin.\n");
     }
-
 
     m68k_init(&g_cpu, g_mem, TOTAL_MEM_SIZE);
     m68k_reset(&g_cpu);
