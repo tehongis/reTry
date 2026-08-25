@@ -15,20 +15,35 @@ HDD_DMA_ADDR EQU $001FFF04 ; DMA Kohde/Lähdeosoite RAMissa (Long)
 HDD_CMD      EQU $001FFF08 ; Komentorekisteri (1=Lue DMA, 2=Kirjoita DMA)
 INT_CLEAR    EQU $001FFF0C ; Keskeytyskuittaus
 
+EXT_APP_START   EQU     $00005000
+
+
             org     $00000000
-* --- M68k Vektoritaulukko ---
-            dc.l    $00080000           ; Initial Stack Pointer (SSP)
-            dc.l    BIOS_INIT           ; Initial Program Counter (PC)
 
-* --- M68k Autovektorikeskeytykset (UUSI JÄRJESTYS) ---
-            org     $00000064
-            dc.l    INT_HDD             ; Level 1 ($64): Virtuaali-DMA HDD (Matalin prioriteetti)
-            dc.l    INT_KEYBOARD        ; Level 2 ($68): Keyboard
-            dc.l    INT_VBLANK          ; Level 3 ($6C): VBLANK
-            dc.l    INT_TIMER           ; Level 4 ($70): Ajastin / Kello (Korkein prioriteetti)
+* --- 1. PAKOLLISET ALUSTUSVEKTORIT (Offset 0 - 7) ---
+            dc.l    $00080000           ; SP: Initial Stack Pointer ($00000000)
+            dc.l    $00001000           ; PC: Initial Program Counter ($00000004) -> Kone starttaa tonnista
 
-            org     $00001000
+* --- 2. TÄYTETÄÄN VECTORIT 2 - 24 NOLLALLA (Offset 8 - 99 / $08 - $63) ---
+            ; Varataan tilaa muille prosessorin poikkeuksille (Bus Error, Illegal jne.)
+            ; $64 - $08 = 92 tavua -> 23 kpl 32-bittisiä pitkäsanoja (dc.l)
+            dcb.l   23,0                ; Täytetään 23 seuraavaa vektoripaikkaa puhtaasti nollalla
 
+* --- 3. NYT OLLAAN REAALIAJASSA OSOITTEESSA $00000064 (Autovektorit 1 - 4) ---
+            dc.l    INT_HDD             ; Level 1 ($00000064)
+            dc.l    INT_KEYBOARD        ; Level 2 ($00000068)
+            dc.l    INT_VBLANK          ; Level 3 ($0000006C)
+            dc.l    INT_TIMER           ; Level 4 ($00000070)
+
+* --- 4. TÄYTETÄÄN LOPUT VEKTORIPÖYDÄSTÄ JA VARATAAN VÄLI OSOITTEESEEN $1000 ASTI ---
+            ; Autovektoreiden jälkeen ollaan osoitteessa $00000074.
+            ; Lasketaan täytettä tonniin asti: $1000 - $74 = 3980 tavua.
+            ds.b    $1000-$00000074     ; Pakotetaan kääntäjä täyttämään loppuosa nollilla
+
+* =============================================================================
+* VIRALLINEN HYPPYTAULUKKO - TÄSMÄLLEEN OSOITTEESSA $00001000
+* =============================================================================
+ 
 B_INIT:           jmp     BIOS_INIT
 B_PRINT_CHAR:     jmp     PRINT_CHAR
 B_CLEAR_SCREEN:   jmp     CLEAR_SCREEN
@@ -40,6 +55,9 @@ B_PRINT_STR:      jmp     BIOS_PRINT_STR
 B_GLOBAL_HALT:    jmp     GLOBAL_HALT    
 
 BIOS_INIT:
+
+            move.w  #$2700,sr
+            
             ; Nollataan järjestelmän muuttujat
             clr.l   (USER_VBLANK)
             clr.l   (USER_KBD)
@@ -332,6 +350,10 @@ NEXT_PIXEL:
             movem.l (sp)+,d1-d6/a0-a1
             rts
 
+GLOBAL_HALT:
+.HALTLOOP   stop    #$2700
+            bra.s   .HALTLOOP
+
 * =============================================================================
 * LOOKUP-TAULUKOT, MERKKIJONOT JA RAM-MUUTTUJAT
 * =============================================================================
@@ -369,12 +391,5 @@ SCANCODE_LUT:
             dc.b    'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', $27, '`', 0, $5C, 'Z', 'X', 'C', 'V'
             dc.b    'B', 'N', 'M', ',', '.', '/', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0
 
-            org     $00004ff0
-GLOBAL_HALT:
-.HALTLOOP         stop    #$2700
-                  bra.s   .HALTLOOP
-
-            org     $00005000
-EXT_APP_START:
             
-            end     BIOS_INIT           ; KORJAUS: Ilmoitetaan kääntäjälle aloituspiste!
+            end

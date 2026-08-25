@@ -240,16 +240,19 @@ int main(void) {
     m68k_init(&g_cpu, g_mem, TOTAL_MEM_SIZE);
     m68k_reset(&g_cpu);
 
+
+
 /*
     g_cpu.sr = 0x2000; 
 
     g_cpu.vbr = 0x00000000;
-
     g_cpu.ssp = 0x00080000; // Pinon alku osoitteesta $00080000
     g_cpu.pc  = 0x00001000; // Pakotetaan CPU aloittamaan suoraan BIOS_INIT-kohdasta!
+
     printf("[EMU HARDWARE] Suorittimen keskeytysväylä herätetty livenä (SR=0x2000, VBR=0).\n");
 
 */
+
 
     HINSTANCE hInstance = GetModuleHandle(NULL);
     WNDCLASSEXA wc = {
@@ -279,10 +282,29 @@ int main(void) {
 
     MSG msg;
 
+
     printf("==================================================================\n");
     printf("[EMU] Kaynnistetaan M68k...\n");
     printf("==================================================================\n");
 
+/*
+    // =============================================================================
+    // ROCKET68 DIAGNOSTIIKKA: MUISTIN ALUN HEX-DUMPPEJA (0 - 2048 tavua)
+    // =============================================================================
+    printf("\n==================================================================\n");
+    printf("[EMU DIAG] Tulostetaan muistin $0000-$2000 KB :\n");
+    printf("==================================================================\n");
+    
+    for (u32 addr = 0; addr < 0x800; addr += 32) {
+        printf("$%08X: ", addr);
+        // Tulostetaan 16 tavua hexana
+        for (int i = 0; i < 32; i++) {
+            printf("%02X ", g_mem[addr + i]);
+        }
+        printf("\n");
+    }
+    printf("==================================================================\n\n");
+*/
     running = TRUE;
     while (running) {
         while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -291,13 +313,14 @@ int main(void) {
             DispatchMessage(&msg);
         }
 
+        u32 last_pc = m68k_get_pc(&g_cpu);
         m68k_execute(&g_cpu, 4096);
         u32 current_pc = m68k_get_pc(&g_cpu);
-        printf("PC: $%08x \n",current_pc);
+        //printf("CPU stepped from $%08x to $%08x \n",last_pc,current_pc);
 
         handle_hdd_io();
 
-        if ((current_pc >= 0x00000FF0 && current_pc <= 0x00000FF4)) {
+        if ((current_pc >= 0x000012CE && current_pc <= 0x000012D2)){
             
             printf("\n==================================================================\n");
             printf("[EMU HALT] Jarjestelma suoritti hatajarrutuksen osoitteessa 0x%08X!\n", current_pc);

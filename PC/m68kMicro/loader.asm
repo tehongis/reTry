@@ -5,9 +5,18 @@
 * Koko ohjelma, data ja allekirjoitus mahtuvat nyt tasan 512 tavuun.
 
 * --- LIITOKSET BIOS-HYPPYKIRJASTOON ---
-B_HDD_READ      EQU     $00000818           
-B_PRINT_STR     EQU     $00000824           
-B_GLOBAL_HALT   EQU     $00000830           ; UUSI: Järjestelmätason globaali hätäjarru
+* =============================================================================
+* ROCKET68 BIOS V3.0 - VIRALLISET RAJAPINTAOSOITTEET (JUMP TABLE OFFSETS)
+* =============================================================================
+B_INIT          EQU     $00001000   ; BIOS Alustusrutiini (Cold Boot)
+B_PRINT_CHAR    EQU     $00001006   ; Tulostaa yhden ASCII-merkin (D0=char, D1=X, D2=Y)
+B_CLEAR_SCREEN  EQU     $0000100C   ; Tyhjentää ruudun paletin värillä 0 (Musta)
+B_SCROLL_UP     EQU     $00001012   ; Skrollaa ruutua yhden tekstirivin verran ylöspäin
+B_SCROLL_DOWN   EQU     $00001018   ; Skrollaa ruutua yhden tekstirivin verran alaspäin
+B_HDD_READ      EQU     $0000101E   ; DMA-lukulohko (D0=LBA, A0=Kohde-RAM)
+B_HDD_WRITE     EQU     $00001024   ; DMA-kirjoituslohko (D0=LBA, A0=Lähde-RAM)
+B_PRINT_STR     EQU     $0000102A   ; Tulostaa nollatavuun päättyvän lokijonon (A4=Osoite)
+B_GLOBAL_HALT   EQU     $00001030   ; Pysäyttää suorittimen laitteistotasolla (Panic)
 
             org     $00005000
 

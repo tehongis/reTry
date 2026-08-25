@@ -1,280 +1,649 @@
 Sections:
-00: "seg0" (0-8)
-01: "seg1000" (1000-1005)
-02: "seg100" (100-2D6)
+00: "seg0" (0-163E)
 
 
 Source: "bios.asm"
                             	     1: * =============================================================================
-                            	     2: * Rocket68 BIOS & ROM Monitor (Pienet kirjaimet & Ei välejä pilkun jälkeen)
+                            	     2: * Rocket68 Pure BIOS / HAL with Hard Disk Autoboot & Boot Logs
                             	     3: * =============================================================================
                             	     4: 
-                            	     5: * --- LAITTEISTON VAKIOMÄÄRITTELYT (Alkaen sarakkeesta 1) ---
-                            	     6: BEEP_REG    EQU     $001FFFFC           ; Aanilaite (Word: Hz taajuus)
-                            	     7: KEYBOARD    EQU     $001FFFFF           ; Nappaimisto (Byte: b7=Make/Break)
-                            	     8: FB_START    EQU     $00200000           ; Framebufferin alku (320x256, 8-bit)
-                            	     9: PALETTE     EQU     $00214000           ; Palettimuistin alku (256 * RGBQUAD)
-                            	    10: FONT_ROM    EQU     $00220000           ; Toshiba FONT.ROM uusi sijainti RAMissa
-                            	    11: 
-                            	    12:             org     $00000000
-                            	    13: 
-                            	    14: * --- M68k Vektoritaulukko ---
-00:00000000 00080000        	    15:             dc.l    $00080000           ; Initial Stack Pointer (SSP)
-00:00000004 00000100        	    16:             dc.l    START               ; Initial Program Counter (PC)
+                            	     5: * --- LAITTEISTON VAKIOMÄÄRITTELYT ---
+                            	     6: VBLANK      EQU     $001FFFFB
+                            	     7: BEEP_REG    EQU     $001FFFFC
+                            	     8: KEYBOARD    EQU     $001FFFFF
+                            	     9: FB_START    EQU     $00200000
+                            	    10: PALETTE     EQU     $00214000
+                            	    11: FONT_ROM    EQU     $00220000
+                            	    12: 
+                            	    13: HDD_PAGE     EQU $001FFF00 ; LBA-sektori (Long)
+                            	    14: HDD_DMA_ADDR EQU $001FFF04 ; DMA Kohde/Lähdeosoite RAMissa (Long)
+                            	    15: HDD_CMD      EQU $001FFF08 ; Komentorekisteri (1=Lue DMA, 2=Kirjoita DMA)
+                            	    16: INT_CLEAR    EQU $001FFF0C ; Keskeytyskuittaus
                             	    17: 
-                            	    18: * --- Jarjestelmamuuttujat RAM-alueella ---
-                            	    19:             org     $00001000
-01:00001000 00              	    20: CURSOR_X    ds.b    1
-01:00001001 00              	    21: CURSOR_Y    ds.b    1
-01:00001002 00              	    22: BLINK_CTR   ds.b    1
-01:00001003 00              	    23: BLINK_STATE ds.b    1
-01:00001004 00              	    24: LAST_KEY    ds.b    1                   ; Edellisen kierroksen raaka nappaintila
-                            	    25: 
-                            	    26: * --- Jarjestelman kaynnistys ---
-                            	    27:             org     $00000100
-                            	    28: START:
-                            	    29:             ; 1. Alustetaan muuttujat nolliksi
-02:00000100 42381000        	    30:             clr.b   (CURSOR_X)
-02:00000104 42381001        	    31:             clr.b   (CURSOR_Y)
-02:00000108 42381002        	    32:             clr.b   (BLINK_CTR)
-02:0000010C 42381003        	    33:             clr.b   (BLINK_STATE)
-02:00000110 42381004        	    34:             clr.b   (LAST_KEY)
-                            	    35: 
-                            	    36:             ; 2. Alustetaan oletusvarikartta (0=Musta, 1=Valkoinen)
-02:00000114 207C00214000    	    37:             movea.l #PALETTE,a0
-02:0000011A 4298            	    38:             clr.l   (a0)+               ; Index 0: Musta tausta
-02:0000011C 20FC00FFFFFF    	    39:             move.l  #$00FFFFFF,(a0)+   ; Index 1: Valkoinen teksti
-                            	    40: 
-                            	    41:             ; 3. Tyhjennetaan nayttomuisti
-02:00000122 61000096        	    42:             bsr     CLEAR_SCREEN
-                            	    43: 
-                            	    44:             ; 4. Tulostetaan aloituskehote "> " naytolle
-02:00000126 103C003E        	    45:             move.b  #62,d0              ; ASCII '>'
-02:0000012A 610000CC        	    46:             bsr     PRINT_CHAR
-02:0000012E 103C0020        	    47:             move.b  #32,d0              ; ASCII ' '
-02:00000132 610000C4        	    48:             bsr     PRINT_CHAR
-                            	    49: 
-                            	    50: * --- INTERAKTIIVINEN PAASILMUKKA ---
-                            	    51: MAIN_LOOP:
-02:00000136 6100013C        	    52:             bsr     UPDATE_CURSOR
-                            	    53: 
-                            	    54:             ; Luetaan raaka keycode nimea kayttaen
-02:0000013A 1039001FFFFF    	    55:             move.b  (KEYBOARD),d0
-02:00000140 67F4            	    56:             beq     MAIN_LOOP           ; Jos nolla, odotetaan
-                            	    57: 
-02:00000142 B0381004        	    58:             cmp.b   (LAST_KEY),d0
-02:00000146 67EE            	    59:             beq     MAIN_LOOP
-02:00000148 11C01004        	    60:             move.b  d0,(LAST_KEY)
-                            	    61: 
-02:0000014C 08000007        	    62:             btst    #7,d0
-02:00000150 6714            	    63:             beq     .key_released       ; Jos bitti 7 on 0 -> vapautus
-                            	    64: 
-                            	    65:             ; Nappain painettiin alas (Make)! Pyyhitaan tilabitti 7 pois
-02:00000152 0200007F        	    66:             andi.b  #$7F,d0
-02:00000156 6100013A        	    67:             bsr     ERASE_CURSOR
-02:0000015A 6100009C        	    68:             bsr     PRINT_CHAR
-                            	    69: 
-02:0000015E B03C004D        	    70:             cmp.b   #$4D,d0             ; 'M'-nappaimen Virtual-Key arvo
-02:00000162 670E            	    71:             beq     CMD_M
-                            	    72: 
-02:00000164 60D0            	    73:             bra     MAIN_LOOP
-                            	    74: 
-                            	    75: .key_released:
-02:00000166 42381004        	    76:             clr.b   (LAST_KEY)
-02:0000016A 4239001FFFFF    	    77:             clr.b   (KEYBOARD)          ; Siivotaan vayla
-02:00000170 60C4            	    78:             bra     MAIN_LOOP
-                            	    79: 
-                            	    80: * --- MONITORIKOMENTO: M ---
-                            	    81: CMD_M:
-                            	    82:             ; Soitetaan 440 Hz aanimerkki nimea kayttaen
-02:00000172 33FC01B8001FFFFC	    83:             move.w  #440,(BEEP_REG)
-                            	    84: 
-02:0000017A 103C000A        	    85:             move.b  #10,d0              ; Newline (\n)
-02:0000017E 6178            	    86:             bsr     PRINT_CHAR
-02:00000180 103C0052        	    87:             move.b  #82,d0              ; 'R'
-02:00000184 6172            	    88:             bsr     PRINT_CHAR
-02:00000186 103C0041        	    89:             move.b  #65,d0              ; 'A'
-02:0000018A 616C            	    90:             bsr     PRINT_CHAR
-02:0000018C 103C004D        	    91:             move.b  #77,d0              ; 'M'
-02:00000190 6166            	    92:             bsr     PRINT_CHAR
-02:00000192 103C003A        	    93:             move.b  #58,d0              ; ':'
-02:00000196 6160            	    94:             bsr     PRINT_CHAR
-02:00000198 103C0020        	    95:             move.b  #32,d0              ; ' '
-02:0000019C 615A            	    96:             bsr     PRINT_CHAR
-02:0000019E 103C0030        	    97:             move.b  #48,d0              ; '0'
-02:000001A2 6154            	    98:             bsr     PRINT_CHAR
-02:000001A4 103C000A        	    99:             move.b  #10,d0              ; Newline
-02:000001A8 614E            	   100:             bsr     PRINT_CHAR
-02:000001AA 103C003E        	   101:             move.b  #62,d0              ; '>'
-02:000001AE 6148            	   102:             bsr     PRINT_CHAR
-02:000001B0 103C0020        	   103:             move.b  #32,d0              ; ' '
-02:000001B4 6142            	   104:             bsr     PRINT_CHAR
-                            	   105: 
-02:000001B6 6000FF7E        	   106:             bra     MAIN_LOOP
-                            	   107: 
-                            	   108: * --- BIOS ALIRUTIINIT ---
-                            	   109: 
-                            	   110: CLEAR_SCREEN:
-02:000001BA 207C00200000    	   111:             movea.l #FB_START,a0
-02:000001C0 303C4FFF        	   112:             move.w  #20479,d0           ; 320 * 256 / 4 = 20480 pitkaa sanaa - 1
-                            	   113: .clear_loop:
-02:000001C4 4298            	   114:             clr.l   (a0)+
-02:000001C6 51C8FFFC        	   115:             dbra    d0,.clear_loop
-02:000001CA 42381000        	   116:             clr.b   (CURSOR_X)
-02:000001CE 42381001        	   117:             clr.b   (CURSOR_Y)
-02:000001D2 4E75            	   118:             rts
+                            	    18: EXT_APP_START   EQU     $00005000
+                            	    19: 
+                            	    20: 
+                            	    21:             org     $00000000
+                            	    22: 
+                            	    23: * --- 1. PAKOLLISET ALUSTUSVEKTORIT (Offset 0 - 7) ---
+00:00000000 00080000        	    24:             dc.l    $00080000           ; SP: Initial Stack Pointer ($00000000)
+00:00000004 00001000        	    25:             dc.l    $00001000           ; PC: Initial Program Counter ($00000004) -> Kone starttaa tonnista
+                            	    26: 
+                            	    27: * --- 2. TÄYTETÄÄN VECTORIT 2 - 24 NOLLALLA (Offset 8 - 99 / $08 - $63) ---
+                            	    28:             ; Varataan tilaa muille prosessorin poikkeuksille (Bus Error, Illegal jne.)
+                            	    29:             ; $64 - $08 = 92 tavua -> 23 kpl 32-bittisiä pitkäsanoja (dc.l)
+00:00000008 00000000        	    30:             dcb.l   23,0                ; Täytetään 23 seuraavaa vektoripaikkaa puhtaasti nollalla
+00:0000000C *
+                            	    31: 
+                            	    32: * --- 3. NYT OLLAAN REAALIAJASSA OSOITTEESSA $00000064 (Autovektorit 1 - 4) ---
+00:00000064 00001192        	    33:             dc.l    INT_HDD             ; Level 1 ($00000064)
+00:00000068 00001146        	    34:             dc.l    INT_KEYBOARD        ; Level 2 ($00000068)
+00:0000006C 00001122        	    35:             dc.l    INT_VBLANK          ; Level 3 ($0000006C)
+00:00000070 000011A8        	    36:             dc.l    INT_TIMER           ; Level 4 ($00000070)
+                            	    37: 
+                            	    38: * --- 4. TÄYTETÄÄN LOPUT VEKTORIPÖYDÄSTÄ JA VARATAAN VÄLI OSOITTEESEEN $1000 ASTI ---
+                            	    39:             ; Autovektoreiden jälkeen ollaan osoitteessa $00000074.
+                            	    40:             ; Lasketaan täytettä tonniin asti: $1000 - $74 = 3980 tavua.
+00:00000074 00              	    41:             ds.b    $1000-$00000074     ; Pakotetaan kääntäjä täyttämään loppuosa nollilla
+00:00000075 *
+                            	    42: 
+                            	    43: * =============================================================================
+                            	    44: * VIRALLINEN HYPPYTAULUKKO - TÄSMÄLLEEN OSOITTEESSA $00001000
+                            	    45: * =============================================================================
+                            	    46:  
+00:00001000 4EF81024        	    47: B_INIT:           jmp     BIOS_INIT
+00:00001004 4EF81276        	    48: B_PRINT_CHAR:     jmp     PRINT_CHAR
+00:00001008 4EF81214        	    49: B_CLEAR_SCREEN:   jmp     CLEAR_SCREEN
+00:0000100C 4EF81226        	    50: B_SCROLL_UP:      jmp     SCROLL_UP
+00:00001010 4EF81246        	    51: B_SCROLL_DOWN:    jmp     SCROLL_DOWN
+00:00001014 4EF811CA        	    52: B_HDD_READ:       jmp     HDD_READ_SECTOR
+00:00001018 4EF811EE        	    53: B_HDD_WRITE:      jmp     HDD_WRITE_SECTOR
+00:0000101C 4EF810DE        	    54: B_PRINT_STR:      jmp     BIOS_PRINT_STR
+00:00001020 4EF812CE        	    55: B_GLOBAL_HALT:    jmp     GLOBAL_HALT    
+                            	    56: 
+                            	    57: BIOS_INIT:
+                            	    58: 
+00:00001024 46FC2700        	    59:             move.w  #$2700,sr
+                            	    60:             
+                            	    61:             ; Nollataan järjestelmän muuttujat
+00:00001028 42B812D8        	    62:             clr.l   (USER_VBLANK)
+00:0000102C 42B812DC        	    63:             clr.l   (USER_KBD)
+00:00001030 42B812E0        	    64:             clr.l   (USER_HDD)
+00:00001034 42B812E4        	    65:             clr.l   (USER_TIMER)
+00:00001038 42B812E8        	    66:             clr.l   (SYS_TICKS)
+00:0000103C 423812EE        	    67:             clr.b   (BIOS_KBD_NEW)
+00:00001040 423812EF        	    68:             clr.b   (BIOS_KBD_CHAR)
+00:00001044 423812F0        	    69:             clr.b   (BIOS_HDD_DONE)
+                            	    70: 
+                            	    71:             ; Alustetaan väripaletti (Musta tausta, valkoinen teksti)
+00:00001048 207C00214000    	    72:             movea.l #PALETTE,a0
+00:0000104E 4298            	    73:             clr.l   (a0)+
+00:00001050 20FC00FFFFFF    	    74:             move.l  #$00FFFFFF,(a0)+
+                            	    75: 
+00:00001056 610001BC        	    76:             bsr     CLEAR_SCREEN
+                            	    77:             
+                            	    78:             ; Asetetaan aloituskoordinaatit lokitulostukselle
+00:0000105A 423812F2        	    79:             clr.b   (L_CUR_X)
+00:0000105E 423812F3        	    80:             clr.b   (L_CUR_Y)
+                            	    81: 
+                            	    82:             ; Tulostetaan tervetuloviesti
+00:00001062 49F814F4        	    83:             lea     MSG_WELCOME,a4
+00:00001066 6176            	    84:             bsr     BIOS_PRINT_STR
+                            	    85: 
+                            	    86:             ; Sallitaan keskeytykset (SR = $2000)
+00:00001068 46FC2000        	    87:             move.w  #$2000,sr
+                            	    88: 
+                            	    89: * --- AUTOBOOT LOGIIKKA ---
+00:0000106C 49F8151A        	    90:             lea     MSG_HDD_INIT,a4
+00:00001070 616C            	    91:             bsr     BIOS_PRINT_STR
+                            	    92: 
+                            	    93:             ; Luetaan LBA 0 (Kovalevyn ensimmäinen sektori) väliaikaiseen puskuriin
+00:00001072 7000            	    94:             moveq   #0,d0               ; LBA = 0
+00:00001074 41F812F4        	    95:             lea     BOOT_SECTOR_BUF,a0  ; Kohdepuskuri RAM-muistissa
+00:00001078 61000150        	    96:             bsr     HDD_READ_SECTOR     ; Luetaan sektori
+00:0000107C 4A00            	    97:             tst.b   d0                  ; Tarkistetaan palautuskoodi (0 = OK)
+00:0000107E 663A            	    98:             bne     BOOT_ERROR_IO
+                            	    99: 
+00:00001080 49F8153C        	   100:             lea     MSG_CHECK_SIG,a4
+00:00001084 6158            	   101:             bsr     BIOS_PRINT_STR
+                            	   102: 
+                            	   103:             ; KORJAUS: Ei luoteta a0-rekisteriin, koska PRINT_CHAR on voinut muuttaa sitä.
+                            	   104:             ; Luetaan maagiset tavut suoraan absoluuttisesta muistiosoitteesta BOOT_SECTOR_BUF + 510.
+                            	   105:             
+00:00001086 327C14F2        	   106:             move.l  #BOOT_SECTOR_BUF+510,a1 ; Käytetään a1-rekisteriä varmuuden vuoksi
+                            	   107:             
+                            	   108:             ; Testataan tavu 510 (Pitäisi olla 'O' = $4F)
+00:0000108A 0C11004F        	   109:             cmp.b   #$4F,(a1)
+00:0000108E 663C            	   110:             bne     BOOT_ERROR_MAGIC
+                            	   111: 
+                            	   112:             ; Testataan tavu 511 (Pitäisi olla 'S' = $53)
+00:00001090 0C2900530001    	   113:             cmp.b   #$53,1(a1)
+00:00001096 6634            	   114:             bne     BOOT_ERROR_MAGIC
+                            	   115: 
+                            	   116:             ; --- JOS MOLEMMAT TÄSMÄÄVÄT, JATKETAAN LATAUKSEEN ---
+00:00001098 49F81558        	   117:             lea     MSG_BOOT_OK,a4
+00:0000109C 6140            	   118:             bsr     BIOS_PRINT_STR
                             	   119: 
-                            	   120: SCROLL_UP:
-02:000001D4 207C00200000    	   121:             movea.l #FB_START,a0       
-02:000001DA 43E80A00        	   122:             lea     2560(a0),a1         ; 320 * 8 = 2560 tavua alempana
-02:000001DE 303C4D7F        	   123:             move.w  #19839,d0          
-                            	   124: .scroll_loop:
-02:000001E2 20D9            	   125:             move.l  (a1)+,(a0)+
-02:000001E4 51C8FFFC        	   126:             dbra    d0,.scroll_loop
-                            	   127: 
-02:000001E8 303C027F        	   128:             move.w  #639,d0             ; 2560 / 4 - 1
-                            	   129: .fill_blank:
-02:000001EC 4298            	   130:             clr.l   (a0)+
-02:000001EE 51C8FFFC        	   131:             dbra    d0,.fill_blank
+                            	   120: 
+                            	   121:             ; Allekirjoitus kunnossa! Ilmoitetaan latauksesta
+00:0000109E 49F81558        	   122:             lea     MSG_BOOT_OK,a4
+00:000010A2 613A            	   123:             bsr     BIOS_PRINT_STR
+                            	   124: 
+                            	   125:             ; Kopioidaan loader (510 tavua) sovellusosoitteeseen
+00:000010A4 41F812F4        	   126:             lea     BOOT_SECTOR_BUF,a0  ; Lähde
+00:000010A8 327C5000        	   127:             movea.l #EXT_APP_START,a1   ; Kohde ($00005000)
+00:000010AC 303C00FE        	   128:             move.w  #254,d0             ; (255 * 2) = 510 tavua
+                            	   129: COPY_BOOTLOADER:
+00:000010B0 32D8            	   130:             move.w  (a0)+,(a1)+
+00:000010B2 51C8FFFC        	   131:             dbra    d0,COPY_BOOTLOADER
                             	   132: 
-02:000001F2 53381001        	   133:             subq.b  #1,(CURSOR_Y)      
-02:000001F6 4E75            	   134:             rts
+                            	   133:             ; Hypätään ladatun loader.exe:n suoritukseen!
+00:000010B6 4EF85000        	   134:             jmp     EXT_APP_START
                             	   135: 
-                            	   136: PRINT_CHAR:
-02:000001F8 B03C000A        	   137:             cmp.b   #10,d0              ; Newline check
-02:000001FC 675E            	   138:             beq     .handle_newline
-                            	   139: 
-02:000001FE 0280000000FF    	   140:             andi.l  #$000000FF,d0
-02:00000204 E788            	   141:             lsl.l   #3,d0               ; Kerrotaan 8:lla (CP437 Toshiba-tavuoffset)
-02:00000206 207C00220000    	   142:             movea.l #FONT_ROM,a0
-02:0000020C D1C0            	   143:             adda.l  d0,a0               ; Kohde fontissa
-                            	   144: 
-02:0000020E 7400            	   145:             moveq   #0,d2
-02:00000210 14381001        	   146:             move.b  (CURSOR_Y),d2
-02:00000214 E78A            	   147:             lsl.l   #3,d2               ; Y * 8
-02:00000216 C4FC0140        	   148:             mulu.w  #320,d2             ; Y * 8 * 320
-                            	   149:             
-02:0000021A 7600            	   150:             moveq   #0,d3
-02:0000021C 16381000        	   151:             move.b  (CURSOR_X),d3
-02:00000220 E78B            	   152:             lsl.l   #3,d3               ; X * 8
-                            	   153:             
-02:00000222 227C00200000    	   154:             movea.l #FB_START,a1
-02:00000228 D3C2            	   155:             adda.l  d2,a1
-02:0000022A D3C3            	   156:             adda.l  d3,a1               ; Kohde FB:ssa
-                            	   157: 
-02:0000022C 7807            	   158:             moveq   #7,d4               ; 8 rivia
-                            	   159: .draw_row:
-02:0000022E 1A18            	   160:             move.b  (a0)+,d5           
-02:00000230 7C07            	   161:             moveq   #7,d6               ; 8 bittia
-                            	   162: .draw_col:
-02:00000232 0D05            	   163:             btst    d6,d5
-02:00000234 6706            	   164:             beq     .bg_pixel
-02:00000236 12FC0001        	   165:             move.b  #1,(a1)+            ; Valkoinen pikseli (Indeksi 1)
-02:0000023A 6004            	   166:             bra     .next_pixel
-                            	   167: .bg_pixel:
-02:0000023C 12FC0000        	   168:             move.b  #0,(a1)+            ; Musta pikseli (Indeksi 0)
-                            	   169: .next_pixel:
-02:00000240 51CEFFF0        	   170:             dbra    d6,.draw_col
-02:00000244 43E90138        	   171:             lea     312(a1),a1          ; KORJATTU: Ei valia pilkun jalkeen!
-02:00000248 51CCFFE4        	   172:             dbra    d4,.draw_row
-                            	   173: 
-02:0000024C 52381000        	   174:             addq.b  #1,(CURSOR_X)
-02:00000250 0C3800281000    	   175:             cmp.b   #40,(CURSOR_X)      ; Max 40 saraketta leveyteen
-02:00000256 6D1A            	   176:             blt     .print_done
-02:00000258 42381000        	   177:             clr.b   (CURSOR_X)
-                            	   178: .handle_newline:
-02:0000025C 52381001        	   179:             addq.b  #1,(CURSOR_Y)
-02:00000260 0C3800201001    	   180:             cmp.b   #32,(CURSOR_Y)      ; Max 32 rivia korkeuteen
-02:00000266 6D0A            	   181:             blt     .print_done
-02:00000268 6100FF6A        	   182:             bsr     SCROLL_UP           
-02:0000026C 11FC001F1001    	   183:             move.b  #31,(CURSOR_Y)     
-                            	   184: .print_done:
-02:00000272 4E75            	   185:             rts
+                            	   136: BOOT_ERROR_IO:
+00:000010BA 49F8157A        	   137:             lea     MSG_ERR_IO,a4
+00:000010BE 611E            	   138:             bsr     BIOS_PRINT_STR
+00:000010C0 33FC03E8001FFFFC	   139:             move.w  #1000,(BEEP_REG)    ; Korkea vikapiip
+00:000010C8 4EF812CE        	   140:             jmp     GLOBAL_HALT           ; Hypätään globaaliin sammutukseen
+                            	   141: 
+                            	   142: BOOT_ERROR_MAGIC:
+00:000010CC 49F81592        	   143:             lea     MSG_ERR_SIG,a4
+00:000010D0 610C            	   144:             bsr     BIOS_PRINT_STR
+00:000010D2 33FC00C8001FFFFC	   145:             move.w  #200,(BEEP_REG)     ; Matala virhepiip
+00:000010DA 4EF812CE        	   146:             jmp     GLOBAL_HALT           ; Hypätään globaaliin sammutukseen
+                            	   147: 
+                            	   148: * =============================================================================
+                            	   149: * BIOS MERKKIJONOTULOSTIN (Apufunktio lokeille)
+                            	   150: * =============================================================================
+                            	   151: BIOS_PRINT_STR:
+00:000010DE 48E7E000        	   152:             movem.l d0-d2,-(sp)
+                            	   153: .loop_char:
+00:000010E2 101C            	   154:             move.b  (a4)+,d0
+00:000010E4 6736            	   155:             beq     .str_done
+                            	   156:             
+                            	   157:             ; Haetaan nykyiset kursoripositiot
+00:000010E6 123812F2        	   158:             move.b  (L_CUR_X),d1
+00:000010EA 143812F3        	   159:             move.b  (L_CUR_Y),d2
+                            	   160:             
+                            	   161:             ; Tarkistetaan rivinvaihto \n (ASCII 10)
+00:000010EE B03C000A        	   162:             cmp.b   #10,d0
+00:000010F2 670C            	   163:             beq     .newline
+                            	   164:             
+                            	   165:             ; Tulostetaan merkki näytölle
+00:000010F4 61000180        	   166:             bsr     PRINT_CHAR
+                            	   167:             
+                            	   168:             ; Kasvatetaan X-koordinaattia
+00:000010F8 5201            	   169:             addq.b  #1,d1
+00:000010FA B23C0028        	   170:             cmp.b   #40,d1
+00:000010FE 6512            	   171:             bcs     .save_coords
+                            	   172: .newline:
+00:00001100 4201            	   173:             clr.b   d1                  ; X = 0
+00:00001102 5202            	   174:             addq.b  #1,d2               ; Y++
+00:00001104 B43C0020        	   175:             cmp.b   #32,d2
+00:00001108 6508            	   176:             bcs     .save_coords
+00:0000110A 6100011A        	   177:             bsr     SCROLL_UP           ; Skrollataan jos ruutu täynnä
+00:0000110E 143C001F        	   178:             move.b  #31,d2
+                            	   179: .save_coords:
+00:00001112 11C112F2        	   180:             move.b  d1,(L_CUR_X)
+00:00001116 11C212F3        	   181:             move.b  d2,(L_CUR_Y)
+00:0000111A 60C6            	   182:             bra     .loop_char
+                            	   183: .str_done:
+00:0000111C 4CDF0007        	   184:             movem.l (sp)+,d0-d2
+00:00001120 4E75            	   185:             rts
                             	   186: 
-                            	   187: UPDATE_CURSOR:
-02:00000274 52381002        	   188:             addq.b  #1,(BLINK_CTR)
-02:00000278 0C3800191002    	   189:             cmp.b   #25,(BLINK_CTR)    
-02:0000027E 6D0A            	   190:             blt     .cursor_draw
-02:00000280 42381002        	   191:             clr.b   (BLINK_CTR)
-02:00000284 0A3800011003    	   192:             eori.b  #1,(BLINK_STATE)   
-                            	   193: .cursor_draw:
-02:0000028A 1C381003        	   194:             move.b  (BLINK_STATE),d6   
-02:0000028E 6108            	   195:             bsr     RENDER_CURSOR_BLOCK
-02:00000290 4E75            	   196:             rts
-                            	   197: 
-                            	   198: ERASE_CURSOR:
-02:00000292 7C00            	   199:             moveq   #0,d6              
-02:00000294 6102            	   200:             bsr     RENDER_CURSOR_BLOCK
-02:00000296 4E75            	   201:             rts
-                            	   202: 
-                            	   203: RENDER_CURSOR_BLOCK:
-02:00000298 7200            	   204:             moveq   #0,d1
-02:0000029A 12381001        	   205:             move.b  (CURSOR_Y),d1
-02:0000029E E789            	   206:             lsl.l   #3,d1
-02:000002A0 C2FC0140        	   207:             mulu.w  #320,d1
-02:000002A4 7400            	   208:             moveq   #0,d2
-02:000002A6 14381000        	   209:             move.b  (CURSOR_X),d2
-02:000002AA E78A            	   210:             lsl.l   #3,d2
-02:000002AC 227C00200000    	   211:             movea.l #FB_START,a1
-02:000002B2 D3C1            	   212:             adda.l  d1,a1
-02:000002B4 D3C2            	   213:             adda.l  d2,a1
-                            	   214:             
-02:000002B6 7607            	   215:             moveq   #7,d3
-                            	   216: .c_row:
-02:000002B8 7807            	   217:             moveq   #7,d4
-                            	   218: .c_col:
-02:000002BA B67C0006        	   219:             cmp.w   #6,d3
-02:000002BE 6D04            	   220:             blt     .cursor_bg
-02:000002C0 12C6            	   221:             move.b  d6,(a1)+           ; Piirretaan alaviivakursori lennosta
-02:000002C2 6004            	   222:             bra     .cursor_next
-                            	   223: .cursor_bg:
-02:000002C4 12FC0000        	   224:             move.b  #0,(a1)+           
-                            	   225: .cursor_next:
-02:000002C8 51CCFFF0        	   226:             dbra    d4,.c_col
-02:000002CC 43E90138        	   227:             lea     312(a1),a1          ; KORJATTU: Ei valia pilkun jalkeen!
-02:000002D0 51CBFFE6        	   228:             dbra    d3,.c_row
-02:000002D4 4E75            	   229:             rts
-                            	   230:             
-                            	   231:             end
-                            	   232: 
+                            	   187: * =============================================================================
+                            	   188: * KESKEYTYSKÄSITTELIJÄT
+                            	   189: * =============================================================================
+                            	   190: INT_VBLANK:
+00:00001122 48E78080        	   191:             movem.l d0/a0,-(sp)
+                            	   192: 
+00:00001126 1039001FFFFB    	   193:             move.b  (VBLANK),d0
+00:0000112C 207812D8        	   194:             movea.l (USER_VBLANK),a0
+00:00001130 B0FC0000        	   195:             cmpa.l  #0,a0
+00:00001134 6702            	   196:             beq     NO_VBL_HOOK
+00:00001136 4E90            	   197:             jsr     (a0)
+                            	   198: NO_VBL_HOOK:
+                            	   199: 
+00:00001138 33FC0001001FFF0C	   200:             move.w  #1,(INT_CLEAR)  
+                            	   201: 
+00:00001140 4CDF0101        	   202:             movem.l (sp)+,d0/a0
+00:00001144 4E73            	   203:             rte
+                            	   204: 
+                            	   205: INT_KEYBOARD:
+00:00001146 48E78080        	   206:             movem.l d0/a0,-(sp)
+                            	   207: 
+00:0000114A 1039001FFFFF    	   208:             move.b  (KEYBOARD),d0
+00:00001150 6732            	   209:             beq     KBD_EXIT
+00:00001152 08000007        	   210:             btst    #7,d0
+00:00001156 6626            	   211:             bne     KEY_RELEASED
+00:00001158 0200007F        	   212:             andi.b  #$7F,d0
+00:0000115C 41F815FE        	   213:             lea     SCANCODE_LUT,a0
+00:00001160 10300000        	   214:             move.b  (a0,d0.w),d0
+00:00001164 671E            	   215:             beq     KBD_EXIT
+00:00001166 11C012EF        	   216:             move.b  d0,(BIOS_KBD_CHAR)
+00:0000116A 11FC000112EE    	   217:             move.b  #1,(BIOS_KBD_NEW)
+00:00001170 207812DC        	   218:             movea.l (USER_KBD),a0
+00:00001174 B0FC0000        	   219:             cmpa.l  #0,a0
+00:00001178 670A            	   220:             beq     KBD_EXIT
+00:0000117A 4E90            	   221:             jsr     (a0)
+00:0000117C 6006            	   222:             bra     KBD_EXIT
+                            	   223: KEY_RELEASED:
+00:0000117E 4239001FFFFF    	   224:             clr.b   (KEYBOARD)
+                            	   225: KBD_EXIT:
+00:00001184 33FC0001001FFF0C	   226:             move.w  #1,(INT_CLEAR)  
+                            	   227: 
+00:0000118C 4CDF0101        	   228:             movem.l (sp)+,d0/a0
+00:00001190 4E73            	   229:             rte
+                            	   230: 
+                            	   231: INT_HDD:
+00:00001192 48E78080        	   232:             movem.l d0/a0,-(sp)
+                            	   233: 
+00:00001196 11FC000112EC    	   234:             move.b  #1,(DMA_READY)      ; Asetetaan valmiusflagi
+00:0000119C 33FC0001001FFF0C	   235:             move.w  #1,(INT_CLEAR)      ; Kuittaus emulaattorille
+                            	   236: 
+00:000011A4 4CDF0101        	   237:             movem.l (sp)+,d0/a0    rte    
+                            	   238: 
+                            	   239: INT_TIMER:
+00:000011A8 48E78080        	   240:             movem.l d0/a0,-(sp)
+                            	   241: 
+00:000011AC 52B812E8        	   242:             addq.l  #1,(SYS_TICKS)
+00:000011B0 207812E4        	   243:             movea.l (USER_TIMER),a0
+00:000011B4 B0FC0000        	   244:             cmpa.l  #0,a0
+00:000011B8 6702            	   245:             beq     NO_TIMER_HOOK
+00:000011BA 4E90            	   246:             jsr     (a0)
+                            	   247: NO_TIMER_HOOK:
+                            	   248: 
+00:000011BC 33FCFFFF001FFF0C	   249:             move.w  #-1,(INT_CLEAR)  
+                            	   250: 
+00:000011C4 4CDF0101        	   251:             movem.l (sp)+,d0/a0
+00:000011C8 4E73            	   252:             rte
+                            	   253: 
+                            	   254: HDD_READ_SECTOR:
+00:000011CA 2F00            	   255:             move.l  d0,-(sp)            ; Suojataan d0 pinon kautta
+                            	   256:             
+00:000011CC 423812EC        	   257:             clr.b   (DMA_READY)         ; Nollataan valmius-flagi
+00:000011D0 23C8001FFF04    	   258:             move.l  a0,(HDD_DMA_ADDR)   ; Kohdeosoite RAMissa
+00:000011D6 23C0001FFF00    	   259:             move.l  d0,(HDD_PAGE)       ; Haluttu sektori
+00:000011DC 33FC0001001FFF08	   260:             move.w  #1,(HDD_CMD)        ; Laukaistaan DMA-luku
+                            	   261: 
+                            	   262: .wait_dma:
+00:000011E4 4A3812EC        	   263:             tst.b   (DMA_READY)
+00:000011E8 67FA            	   264:             beq.s   .wait_dma           ; Korjattu: Ei ä-kirjainta nimeen
+                            	   265: 
+00:000011EA 201F            	   266:             move.l  (sp)+,d0            ; Palautetaan d0
+00:000011EC 4E75            	   267:             rts
+                            	   268: 
+                            	   269: HDD_WRITE_SECTOR:
+00:000011EE 2F00            	   270:     move.l  d0,-(sp)            ; Suojataan d0 pinon kautta
+                            	   271:     
+00:000011F0 427812EC        	   272:     clr.w   (DMA_READY)         ; Nollataan valmius-flagi ennen aloitusta
+00:000011F4 23C8001FFF04    	   273:     move.l  a0,(HDD_DMA_ADDR)   ; Lähdeosoite RAM-muistissa (mistä kirjoitetaan)
+00:000011FA 23C0001FFF00    	   274:     move.l  d0,(HDD_PAGE)       ; Kohde-sektori (LBA) kiintolevyllä
+00:00001200 33FC0002001FFF08	   275:     move.w  #2,(HDD_CMD)        ; Laukaistaan DMA-kirjoitus komennolla 2
+                            	   276: 
+                            	   277: .wait_dma_write:
+00:00001208 4A7812EC        	   278:     tst.w   (DMA_READY)
+00:0000120C 67FA            	   279:     beq.s   .wait_dma_write     ; Odotetaan, kunnes INT_HDD kuittaa siirron valmiiksi
+                            	   280: 
+00:0000120E 201F            	   281:     move.l  (sp)+,d0            ; Palautetaan d0 pinosta
+00:00001210 7000            	   282:     moveq   #0,d0              ; Palautetaan 0 (Success) merkiksi onnistumisesta
+00:00001212 4E75            	   283:     rts
+                            	   284: 
+                            	   285: CLEAR_SCREEN:
+00:00001214 207C00200000    	   286:             movea.l #FB_START,a0
+00:0000121A 303C4FFF        	   287:             move.w  #20479,d0
+00:0000121E 4298            	   288: CS_LOOP:    clr.l   (a0)+
+00:00001220 51C8FFFC        	   289:             dbra    d0,CS_LOOP
+00:00001224 4E75            	   290:             rts
+                            	   291: 
+                            	   292: SCROLL_UP:
+00:00001226 207C00200000    	   293:             movea.l #FB_START,a0       
+00:0000122C 43E80A00        	   294:             lea     2560(a0),a1         
+00:00001230 303C4D7F        	   295:             move.w  #19839,d0          
+                            	   296: SCROLL_LOOP_UP:
+00:00001234 20D9            	   297:             move.l  (a1)+,(a0)+
+00:00001236 51C8FFFC        	   298:             dbra    d0,SCROLL_LOOP_UP
+00:0000123A 303C027F        	   299:             move.w  #639,d0             
+                            	   300: FILL_BLANK_UP:
+00:0000123E 4298            	   301:             clr.l   (a0)+
+00:00001240 51C8FFFC        	   302:             dbra    d0,FILL_BLANK_UP
+00:00001244 4E75            	   303:             rts
+                            	   304: 
+                            	   305: SCROLL_DOWN:
+00:00001246 207C00213EC0    	   306:             movea.l #FB_START+81600,a0 
+00:0000124C 227C00213EC0    	   307:             movea.l #FB_START+81600,a1 
+00:00001252 41E8F600        	   308:             lea     -2560(a0),a0
+00:00001256 203C00004D2F    	   309:             move.l  #19759,d0
+                            	   310: SCROLL_LOOP_DOWN:
+00:0000125C 2320            	   311:             move.l  -(a0),-(a1) 
+00:0000125E 51C8FFFC        	   312:             dbra    d0,SCROLL_LOOP_DOWN
+00:00001262 207C00200000    	   313:             movea.l #FB_START,a0
+00:00001268 303C027F        	   314:             move.w  #639,d0 
+00:0000126C 7200            	   315:             moveq   #0,d1 
+                            	   316: FILL_BLANK_DOWN:
+00:0000126E 20C1            	   317:             move.l  d1,(a0)+ 
+00:00001270 51C8FFFC        	   318:             dbra    d0,FILL_BLANK_DOWN
+00:00001274 4E75            	   319:             rts
+                            	   320: 
+                            	   321: PRINT_CHAR:
+00:00001276 48E77EC0        	   322:             movem.l d1-d6/a0-a1,-(sp)
+00:0000127A 0280000000FF    	   323:             andi.l  #$000000FF,d0 
+00:00001280 E788            	   324:             lsl.l   #3,d0 
+00:00001282 207C00220000    	   325:             movea.l #FONT_ROM,a0 
+00:00001288 D1C0            	   326:             adda.l  d0,a0 
+00:0000128A 0282000000FF    	   327:             andi.l  #$000000FF,d2 
+00:00001290 E78A            	   328:             lsl.l   #3,d2 
+00:00001292 C4FC0140        	   329:             mulu.w  #320,d2 
+00:00001296 0281000000FF    	   330:             andi.l  #$000000FF,d1 
+00:0000129C E789            	   331:             lsl.l   #3,d1 
+00:0000129E 227C00200000    	   332:             movea.l #FB_START,a1 
+00:000012A4 D3C2            	   333:             adda.l  d2,a1
+00:000012A6 D3C1            	   334:             adda.l  d1,a1 
+00:000012A8 7807            	   335:             moveq   #7,d4 
+                            	   336: DRAW_ROW:
+00:000012AA 1A18            	   337:             move.b  (a0)+,d5 
+00:000012AC 7C07            	   338:             moveq   #7,d6 
+                            	   339: DRAW_ROW_LOOP:
+00:000012AE 0D05            	   340:             btst    d6,d5 
+00:000012B0 6706            	   341:             beq     BG_PIXEL
+00:000012B2 12FC0001        	   342:             move.b  #1,(a1)+ 
+00:000012B6 6004            	   343:             bra     NEXT_PIXEL
+                            	   344: BG_PIXEL:
+00:000012B8 12FC0000        	   345:             move.b  #0,(a1)+ 
+                            	   346: NEXT_PIXEL:
+00:000012BC 51CEFFF0        	   347:             dbra    d6,DRAW_ROW_LOOP
+00:000012C0 43E90138        	   348:             lea     312(a1),a1 
+00:000012C4 51CCFFE4        	   349:             dbra    d4,DRAW_ROW
+00:000012C8 4CDF037E        	   350:             movem.l (sp)+,d1-d6/a0-a1
+00:000012CC 4E75            	   351:             rts
+                            	   352: 
+                            	   353: GLOBAL_HALT:
+00:000012CE 4E722700        	   354: .HALTLOOP   stop    #$2700
+00:000012D2 60FA            	   355:             bra.s   .HALTLOOP
+                            	   356: 
+                            	   357: * =============================================================================
+                            	   358: * LOOKUP-TAULUKOT, MERKKIJONOT JA RAM-MUUTTUJAT
+                            	   359: * =============================================================================
+                            	   360:             EVEN
+00:000012D4 00000000        	   361: BIOS_HDD_TARGET_RAM:  ds.l    1             ; Varataan 4 tavua (Long) kohdemuistiosoitteelle
+00:000012D8 00000000        	   362: USER_VBLANK:  ds.l    1
+00:000012DC 00000000        	   363: USER_KBD:     ds.l    1
+00:000012E0 00000000        	   364: USER_HDD:     ds.l    1
+00:000012E4 00000000        	   365: USER_TIMER:   ds.l    1
+00:000012E8 00000000        	   366: SYS_TICKS:    ds.l    1
+                            	   367: 
+00:000012EC 0000            	   368: DMA_READY:   ds.w 1        ; Flagi, joka asetetaan 1 kun keskeytys saapuu
+                            	   369: 
+00:000012EE 00              	   370: BIOS_KBD_NEW: ds.b    1
+00:000012EF 00              	   371: BIOS_KBD_CHAR:ds.b    1
+00:000012F0 00              	   372: BIOS_HDD_DONE:ds.b    1
+00:000012F1 00              	   373: BIOS_HDD_STATUS_REG: ds.b 1             ; UUSI: Tila keskeytyksestä palautettavalle statukselle
+00:000012F2 00              	   374: L_CUR_X:      ds.b    1                  ; BIOS-lokin oma X-kursori
+00:000012F3 00              	   375: L_CUR_Y:      ds.b    1                  ; BIOS-lokin oma Y-kursori
+                            	   376: 
+00:000012F4 00              	   377: BOOT_SECTOR_BUF: ds.b 512
+00:000012F5 *
+                            	   378: 
+                            	   379:             EVEN
+00:000014F4 526F636B65743638	   380: MSG_WELCOME:  dc.b  "Rocket68 Bios V3.0 - Initializing...",10,0
+00:000014FC 2042696F73205633
+00:00001504 2E30202D20496E69
+00:0000150C 7469616C697A696E
+00:00001514 672E2E2E
+00:00001518 0A
+00:00001519 00
+00:0000151A 416363657373696E	   381: MSG_HDD_INIT: dc.b  "Accessing virtual HDD (LBA 0)...",10,0
+00:00001522 6720766972747561
+00:0000152A 6C2048444420284C
+00:00001532 42412030292E2E2E
+00:0000153A 0A
+00:0000153B 00
+00:0000153C 436865636B696E67	   382: MSG_CHECK_SIG:dc.b  "Checking boot signature...",10,0
+00:00001544 20626F6F74207369
+00:0000154C 676E61747572652E
+00:00001554 2E2E
+00:00001556 0A
+00:00001557 00
+00:00001558 537563636573733A	   383: MSG_BOOT_OK:  dc.b  "Success: Launching loader.exe...",10,0
+00:00001560 204C61756E636869
+00:00001568 6E67206C6F616465
+00:00001570 722E6578652E2E2E
+00:00001578 0A
+00:00001579 00
+00:0000157A 466174616C3A2048	   384: MSG_ERR_IO:   dc.b  "Fatal: HDD read error!",10,0
+00:00001582 4444207265616420
+00:0000158A 6572726F7221
+00:00001590 0A
+00:00001591 00
+00:00001592 466174616C3A204E	   385: MSG_ERR_SIG:  dc.b  "Fatal: No bootable signature found!",10,0
+00:0000159A 6F20626F6F746162
+00:000015A2 6C65207369676E61
+00:000015AA 7475726520666F75
+00:000015B2 6E6421
+00:000015B5 0A
+00:000015B6 00
+00:000015B7 4573696C61646174	   386: MSG_DIRECT_BOOT: dc.b "Esiladattu RAM-kayttojarjestelma havaittu. Kaynnistetaan Monitori...",10,0
+00:000015BF 74752052414D2D6B
+00:000015C7 617974746F6A6172
+00:000015CF 6A657374656C6D61
+00:000015D7 2068617661697474
+00:000015DF 752E204B61796E6E
+00:000015E7 697374657461616E
+00:000015EF 204D6F6E69746F72
+00:000015F7 692E2E2E
+00:000015FB 0A
+00:000015FC 00
+                            	   387:             EVEN
+                            	   388: SCANCODE_LUT:
+00:000015FE 00              	   389:             dc.b    0, 27, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 8, 9
+00:000015FF 1B
+00:00001600 31
+00:00001601 32
+00:00001602 33
+00:00001603 34
+00:00001604 35
+00:00001605 36
+00:00001606 37
+00:00001607 38
+00:00001608 39
+00:00001609 30
+00:0000160A 2D
+00:0000160B 3D
+00:0000160C 08
+00:0000160D 09
+00:0000160E 51              	   390:             dc.b    'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', $0D, 0, 'A', 'S'
+00:0000160F 57
+00:00001610 45
+00:00001611 52
+00:00001612 54
+00:00001613 59
+00:00001614 55
+00:00001615 49
+00:00001616 4F
+00:00001617 50
+00:00001618 5B
+00:00001619 5D
+00:0000161A 0D
+00:0000161B 00
+00:0000161C 41
+00:0000161D 53
+00:0000161E 44              	   391:             dc.b    'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', $27, '`', 0, $5C, 'Z', 'X', 'C', 'V'
+00:0000161F 46
+00:00001620 47
+00:00001621 48
+00:00001622 4A
+00:00001623 4B
+00:00001624 4C
+00:00001625 3B
+00:00001626 27
+00:00001627 60
+00:00001628 00
+00:00001629 5C
+00:0000162A 5A
+00:0000162B 58
+00:0000162C 43
+00:0000162D 56
+00:0000162E 42              	   392:             dc.b    'B', 'N', 'M', ',', '.', '/', 0, '*', 0, ' ', 0, 0, 0, 0, 0, 0
+00:0000162F 4E
+00:00001630 4D
+00:00001631 2C
+00:00001632 2E
+00:00001633 2F
+00:00001634 00
+00:00001635 2A
+00:00001636 00
+00:00001637 20
+00:00001638 00
+00:00001639 00
+00:0000163A 00
+00:0000163B 00
+00:0000163C 00
+00:0000163D 00
+                            	   393: 
+                            	   394:             
+                            	   395:             end
 
 
 Symbols by name:
 BEEP_REG                         E:001FFFFC
-BLINK_CTR                        A:00001002
-BLINK_STATE                      A:00001003
-CLEAR_SCREEN                     A:000001BA
-CMD_M                            A:00000172
-CURSOR_X                         A:00001000
-CURSOR_Y                         A:00001001
-ERASE_CURSOR                     A:00000292
+BG_PIXEL                         A:000012B8
+BIOS_HDD_DONE                    A:000012F0
+BIOS_HDD_STATUS_REG              A:000012F1
+BIOS_HDD_TARGET_RAM              A:000012D4
+BIOS_INIT                        A:00001024
+BIOS_KBD_CHAR                    A:000012EF
+BIOS_KBD_NEW                     A:000012EE
+BIOS_PRINT_STR                   A:000010DE
+BOOT_ERROR_IO                    A:000010BA
+BOOT_ERROR_MAGIC                 A:000010CC
+BOOT_SECTOR_BUF                  A:000012F4
+B_CLEAR_SCREEN                   A:00001008
+B_GLOBAL_HALT                    A:00001020
+B_HDD_READ                       A:00001014
+B_HDD_WRITE                      A:00001018
+B_INIT                           A:00001000
+B_PRINT_CHAR                     A:00001004
+B_PRINT_STR                      A:0000101C
+B_SCROLL_DOWN                    A:00001010
+B_SCROLL_UP                      A:0000100C
+CLEAR_SCREEN                     A:00001214
+COPY_BOOTLOADER                  A:000010B0
+CS_LOOP                          A:0000121E
+DMA_READY                        A:000012EC
+DRAW_ROW                         A:000012AA
+DRAW_ROW_LOOP                    A:000012AE
+EXT_APP_START                    E:00005000
 FB_START                         E:00200000
+FILL_BLANK_DOWN                  A:0000126E
+FILL_BLANK_UP                    A:0000123E
 FONT_ROM                         E:00220000
+GLOBAL_HALT                      A:000012CE
+HDD_CMD                          E:001FFF08
+HDD_DMA_ADDR                     E:001FFF04
+HDD_PAGE                         E:001FFF00
+HDD_READ_SECTOR                  A:000011CA
+HDD_WRITE_SECTOR                 A:000011EE
+INT_CLEAR                        E:001FFF0C
+INT_HDD                          A:00001192
+INT_KEYBOARD                     A:00001146
+INT_TIMER                        A:000011A8
+INT_VBLANK                       A:00001122
+KBD_EXIT                         A:00001184
 KEYBOARD                         E:001FFFFF
-LAST_KEY                         A:00001004
-MAIN_LOOP                        A:00000136
+KEY_RELEASED                     A:0000117E
+L_CUR_X                          A:000012F2
+L_CUR_Y                          A:000012F3
+MSG_BOOT_OK                      A:00001558
+MSG_CHECK_SIG                    A:0000153C
+MSG_DIRECT_BOOT                  A:000015B7
+MSG_ERR_IO                       A:0000157A
+MSG_ERR_SIG                      A:00001592
+MSG_HDD_INIT                     A:0000151A
+MSG_WELCOME                      A:000014F4
+NEXT_PIXEL                       A:000012BC
+NO_TIMER_HOOK                    A:000011BC
+NO_VBL_HOOK                      A:00001138
 PALETTE                          E:00214000
-PRINT_CHAR                       A:000001F8
-RENDER_CURSOR_BLOCK              A:00000298
-SCROLL_UP                        A:000001D4
-START                            A:00000100
-UPDATE_CURSOR                    A:00000274
+PRINT_CHAR                       A:00001276
+SCANCODE_LUT                     A:000015FE
+SCROLL_DOWN                      A:00001246
+SCROLL_LOOP_DOWN                 A:0000125C
+SCROLL_LOOP_UP                   A:00001234
+SCROLL_UP                        A:00001226
+SYS_TICKS                        A:000012E8
+USER_HDD                         A:000012E0
+USER_KBD                         A:000012DC
+USER_TIMER                       A:000012E4
+USER_VBLANK                      A:000012D8
+VBLANK                           E:001FFFFB
 
 Symbols by value:
-00000100 START
-00000136 MAIN_LOOP
-00000172 CMD_M
-000001BA CLEAR_SCREEN
-000001D4 SCROLL_UP
-000001F8 PRINT_CHAR
-00000274 UPDATE_CURSOR
-00000292 ERASE_CURSOR
-00000298 RENDER_CURSOR_BLOCK
-00001000 CURSOR_X
-00001001 CURSOR_Y
-00001002 BLINK_CTR
-00001003 BLINK_STATE
-00001004 LAST_KEY
+00001000 B_INIT
+00001004 B_PRINT_CHAR
+00001008 B_CLEAR_SCREEN
+0000100C B_SCROLL_UP
+00001010 B_SCROLL_DOWN
+00001014 B_HDD_READ
+00001018 B_HDD_WRITE
+0000101C B_PRINT_STR
+00001020 B_GLOBAL_HALT
+00001024 BIOS_INIT
+000010B0 COPY_BOOTLOADER
+000010BA BOOT_ERROR_IO
+000010CC BOOT_ERROR_MAGIC
+000010DE BIOS_PRINT_STR
+00001122 INT_VBLANK
+00001138 NO_VBL_HOOK
+00001146 INT_KEYBOARD
+0000117E KEY_RELEASED
+00001184 KBD_EXIT
+00001192 INT_HDD
+000011A8 INT_TIMER
+000011BC NO_TIMER_HOOK
+000011CA HDD_READ_SECTOR
+000011EE HDD_WRITE_SECTOR
+00001214 CLEAR_SCREEN
+0000121E CS_LOOP
+00001226 SCROLL_UP
+00001234 SCROLL_LOOP_UP
+0000123E FILL_BLANK_UP
+00001246 SCROLL_DOWN
+0000125C SCROLL_LOOP_DOWN
+0000126E FILL_BLANK_DOWN
+00001276 PRINT_CHAR
+000012AA DRAW_ROW
+000012AE DRAW_ROW_LOOP
+000012B8 BG_PIXEL
+000012BC NEXT_PIXEL
+000012CE GLOBAL_HALT
+000012D4 BIOS_HDD_TARGET_RAM
+000012D8 USER_VBLANK
+000012DC USER_KBD
+000012E0 USER_HDD
+000012E4 USER_TIMER
+000012E8 SYS_TICKS
+000012EC DMA_READY
+000012EE BIOS_KBD_NEW
+000012EF BIOS_KBD_CHAR
+000012F0 BIOS_HDD_DONE
+000012F1 BIOS_HDD_STATUS_REG
+000012F2 L_CUR_X
+000012F3 L_CUR_Y
+000012F4 BOOT_SECTOR_BUF
+000014F4 MSG_WELCOME
+0000151A MSG_HDD_INIT
+0000153C MSG_CHECK_SIG
+00001558 MSG_BOOT_OK
+0000157A MSG_ERR_IO
+00001592 MSG_ERR_SIG
+000015B7 MSG_DIRECT_BOOT
+000015FE SCANCODE_LUT
+00005000 EXT_APP_START
+001FFF00 HDD_PAGE
+001FFF04 HDD_DMA_ADDR
+001FFF08 HDD_CMD
+001FFF0C INT_CLEAR
+001FFFFB VBLANK
 001FFFFC BEEP_REG
 001FFFFF KEYBOARD
 00200000 FB_START
