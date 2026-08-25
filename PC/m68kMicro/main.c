@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <windows.h>
+#include <commctrl.h> // Tarvitaan Status Baria varten
 
 #define TOTAL_MEM_SIZE    (4 * 1024 * 1024) 
 #define FB_WIDTH          320
@@ -26,11 +27,19 @@
 #define ADDR_HDD_DMA_ADDR 0x001FFF04  // UUSI: DMA-osoiterekisteri
 #define RAM_SIZE          0x00080000  // RAM-muistin koko (sama kuin Stack Pointerin aloitus)
 
+#define ADDR_INT_CLEAR    0x001FFF0C
+
+// Uudet ID-tunnisteet
+#define ID_RESET_BUTTON 1001
+#define ID_STATUS_BAR   1002
 
 u8* g_hdd_mem = NULL; // Globaali puskuri koko kiintolevyn sisällölle
 u32 last_mapped_page = 0xFFFFFFFF; // Seuraa, milloin sivu muuttuu
 
-#define ADDR_INT_CLEAR    0x001FFF0C
+HWND g_hwndStatus = NULL;
+HWND g_hwndReset = NULL;
+BOOL g_hdd_activity = FALSE;
+int g_hdd_led_timer = 0;
 
 FILE* g_hdd_file = NULL;
 
@@ -45,9 +54,59 @@ BOOL running = false;
 
 u8* g_mem = NULL;
 
+RECT rPart;
+
+void do_system_reset(void) {
+    m68k_reset(&g_cpu);
+}
+
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
-        case WM_PAINT: {
+    case WM_CREATE:
+        // LUODAAN STATUS BAR (Tilarivi) alalaitaan [0x01.11]
+      // 1. Luodaan Status Bar
+        g_hwndStatus = CreateWindowExA(0, STATUSCLASSNAMEA, NULL, 
+                                       WS_CHILD | WS_VISIBLE, 
+                                       0, 0, 0, 0, 
+                                       hwnd, (HMENU)ID_STATUS_BAR, NULL, NULL);
+
+        // Jaetaan tilarivi kolmeen osaan (Lohko 0 napille, Lohko 1 PC:lle, Lohko 2 HDD:lle)
+        int parts[] = { 120, 320, -1 };
+        SendMessage(g_hwndStatus, SB_SETPARTS, 3, (LPARAM)parts);
+
+        // 2. Haetaan tilarivin ensimmäisen lohkon (0) tarkat koordinaatit napille
+
+        SendMessage(g_hwndStatus, SB_GETRECT, 0, (LPARAM)&rPart);
+
+        // 3. Luodaan Reset-painike SUORAAN tilarivin sisälle lohkon 0 kohdalle
+        g_hwndReset = CreateWindowExA(0, "BUTTON", "RESET CPU", 
+                                      WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+                                      rPart.left + 2, rPart.top + 2, 
+                                      (rPart.right - rPart.left) - 4, 
+                                      (rPart.bottom - rPart.top) - 4, 
+                                      g_hwndStatus, (HMENU)ID_RESET_BUTTON, NULL, NULL);
+
+        break;
+    case WM_SIZE:
+        // Päivitetään ohjauskomponenttien paikat [0x01.11]
+       SendMessage(g_hwndStatus, WM_SIZE, 0, 0);
+
+        // Päivitetään napin paikka vastaamaan tilarivin uutta kokoa
+        RECT rPart;
+        SendMessage(g_hwndStatus, SB_GETRECT, 0, (LPARAM)&rPart);
+        MoveWindow(g_hwndReset, 
+                   rPart.left + 2, rPart.top + 2, 
+                   (rPart.right - rPart.left) - 4, 
+                   (rPart.bottom - rPart.top) - 4, 
+                   TRUE);
+        return 0;
+        break;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == ID_RESET_BUTTON) {
+            do_system_reset(); // Nappia painettu [0x01.11]
+        }
+        break;
+    case WM_PAINT: {
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
 
@@ -63,8 +122,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             pbmi->bmiHeader.biCompression = BI_RGB;
             pbmi->bmiHeader.biClrUsed = 256;
 
-            memcpy(pbmi->bmiColors, &g_mem[ADDR_PALETTE_START], 256 * sizeof(RGBQUAD));
-
+            // KORJAUS: Luetaan M68k:n Big-Endian tavut ja käännetään ne Windowsin BGRA-muotoon!
+            u8* m68k_pal = &g_mem[ADDR_PALETTE_START];
+            
+            for (int i = 0; i < 256; i++) {
+                u32 offset = i * 4; // Jokainen väri vie 4 tavua
+                
+                // M68k tavupaikat muistissa: 
+                // offset+0 = Alpha/Tyhjä, offset+1 = Red, offset+2 = Green, offset+3 = Blue
+                pbmi->bmiColors[i].rgbBlue     = m68k_pal[offset + 3]; // Blue
+                pbmi->bmiColors[i].rgbGreen    = m68k_pal[offset + 2]; // Green
+                pbmi->bmiColors[i].rgbRed      = m68k_pal[offset + 1]; // Red
+                pbmi->bmiColors[i].rgbReserved = 0;                    // Pakotetaan Alpha näkyväksi (0)
+            }
             RECT rect;
             GetClientRect(hwnd, &rect);
             StretchDIBits(hdc, 0, 0, rect.right, rect.bottom,
@@ -143,10 +213,12 @@ void handle_hdd_io(void) {
 
         if (hdd_cmd == 1) {
             // Suora siirto tiedostosta virtuaalisen m68k:n RAMiin
+            SendMessage(g_hwndStatus, SB_SETTEXTA, 2, (LPARAM)(g_hdd_activity ? "  HDD: [ BUSY ] 🔴" : "  HDD: [ IDLE ] ⚪"));
             fread(&g_mem[dma_addr], 1, 512, g_hdd_file);
         } 
         else if (hdd_cmd == 2) {
             // Suora siirto m68k:n RAMista tiedostoon
+            SendMessage(g_hwndStatus, SB_SETTEXTA, 2, (LPARAM)(g_hdd_activity ? "  HDD: [ BUSY ] 🔴" : "  HDD: [ IDLE ] ⚪"));
             fwrite(&g_mem[dma_addr], 1, 512, g_hdd_file);
             fflush(g_hdd_file);
         }
@@ -192,7 +264,7 @@ void dump_mem(void) {
         { 0x00005000, 256,   "3. LOADER / BOOTLOADER AREA ($5000-$5100)" },
         { 0x00200000, 512,   "4. RUUTUMUISTI / FRAMEBUFFER ALKU ($00200000-)" },
         { 0x00220000, 256,   "5. FONT ROM GLYYFIT ($00220000-)" },
-        { 0x001FFF40, 64,    "6. PALETTE RAM REKISTERIT ($001FFF40-)" } // UUSI LOHKO
+        { 0x00214000, 64,  "6. REAL PALETTE RAM ($00214000-)" } // KORJATTU OSOITE!
     };
 
     int num_regions = sizeof(regions) / sizeof(regions[0]);
@@ -226,11 +298,14 @@ void dump_mem(void) {
     return;
 }
 
+
 int main(void) {
 
     int timer_counter = 0;
 
     setvbuf(stdout, NULL, _IONBF, 0);
+
+    char statusText[64];   
 
     g_mem = calloc(TOTAL_MEM_SIZE, 1);
     if (!g_mem) return 1;
@@ -318,14 +393,14 @@ int main(void) {
     };
     RegisterClassExA(&wc);
 
-    RECT winRect = { 0, 0, FB_WIDTH * 2, FB_HEIGHT * 2 };
+    // main() sisällä:
+    // Varataan vain 30px tilaa Status Baria varten peliruudun alle
+    RECT winRect = { 0, 0, FB_WIDTH * 2, (FB_HEIGHT * 2) + 30 };
     AdjustWindowRect(&winRect, WS_OVERLAPPEDWINDOW, FALSE);
 
-    g_hwnd = CreateWindowExA(0, "Rocket68HardwareWin", "Rocket68 Interrupt-Driven OS",
-                             WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-                             CW_USEDEFAULT, CW_USEDEFAULT,
-                             winRect.right - winRect.left, winRect.bottom - winRect.top,
-                             NULL, NULL, hInstance, NULL);
+
+    g_hwnd = CreateWindowExA(0, "Rocket68HardwareWin", "Rocket68", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 
+                             CW_USEDEFAULT, CW_USEDEFAULT, winRect.right - winRect.left, winRect.bottom - winRect.top, NULL, NULL, hInstance, NULL);
 
     if (!g_hwnd) {
         printf("[ERROR] Grafiikkaikkunan luominen epaonnistui!\n");
@@ -348,10 +423,15 @@ int main(void) {
             DispatchMessage(&msg);
         }
 
-        u32 last_pc = m68k_get_pc(&g_cpu);
-        m68k_execute(&g_cpu, 4096);
+//        u32 last_pc = m68k_get_pc(&g_cpu);
+        m68k_execute(&g_cpu, 50000);
         u32 current_pc = m68k_get_pc(&g_cpu);
-        printf("CPU stepped from $%08x to $%08x \n",last_pc,current_pc);
+//        printf("CPU stepped from $%08x to $%08x \n",last_pc,current_pc);
+
+        sprintf(statusText, "  CPU PC: $%08X", m68k_get_pc(&g_cpu));
+        SendMessage(g_hwndStatus, SB_SETTEXTA, 1, (LPARAM)statusText);
+
+        InvalidateRect(g_hwnd, NULL, FALSE);
 
         handle_hdd_io();
 
@@ -383,7 +463,7 @@ int main(void) {
         }
 
         if (running==FALSE) {
-            dump_mem(void);
+            dump_mem();
             dump_cpu_crash_state();
         }
 

@@ -37,9 +37,11 @@ def make_disk():
         print(f"VIRHE: {MONITOR_BIN} puuttuu!")
         return
 
-    # 4. LUODAAN INDEKSITAULUKKO LBA 1 -LOHKOON (offset 512)
     dir_offset = 512
+
+    # Varmistetaan että nimi katkeaa nollaan ja loppuala (12 tavua) täytetään nollalla
     name = b"MONITOR.SYS\x00"
+    disk[dir_offset : dir_offset + 12] = b"\x00" * 12
     disk[dir_offset : dir_offset + len(name)] = name
     
     # Big-Endian pituudet M68k:lle
